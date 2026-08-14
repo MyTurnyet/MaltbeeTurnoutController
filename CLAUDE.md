@@ -26,6 +26,8 @@ pio test -e native -f test_<name>
 
 There is no `native` build target for `src/` (`test_build_src = false` in `platformio.ini`) — native test binaries only compile `test/` plus whatever `lib/` code they include, not `main.cpp`.
 
+**If `pio test -e native` fails to *run* (not compile) with a Windows status like `0xC0000139` / `STATUS_ENTRYPOINT_NOT_FOUND`:** this is a stale `libstdc++-6.dll` earlier on `PATH` shadowing the MinGW runtime the test binary was linked against, not a code problem. Make sure your MinGW `bin` directory is ahead of any other GCC/MinGW installs on `PATH` before running tests.
+
 ## Architecture
 
 Hexagonal architecture, same discipline as the MaltbeeController project this was scaffolded from. The critical rule: **domain and application code must compile and run under the `native` PlatformIO environment without `Arduino.h`.** Hardware-specific code is isolated behind ports (interfaces) and only implemented in adapters.
@@ -42,6 +44,8 @@ Hexagonal architecture, same discipline as the MaltbeeController project this wa
 - `lib/McsCore/src/domain/`, `lib/McsCore/src/application/`, `lib/McsCore/src/adapters/` — empty until real classes are needed
 - `test/support/` — hand-written fakes (`FakeClock`, `FakeDigitalOutput`, `FakePwmOutput`, ...)
 - `test/test_<name>/test_main.cpp` — Catch2 test binaries
+
+**Why `native`'s `build_flags` includes `-Ilib/McsCore/src`:** PlatformIO's dependency finder only adds a `lib/` folder to the include path when some already-compiled file references it directly. A test file that only includes `support/FakeX.h` (which in turn includes `ports/X.h`) never triggers that discovery, since the fake isn't itself a recognized library dependency — so `ports/X.h` wouldn't resolve without the explicit `-I`. Keep this flag when adding new ports.
 
 ## Engineering Principles
 

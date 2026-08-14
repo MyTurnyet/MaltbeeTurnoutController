@@ -46,7 +46,7 @@
 - Consumes: nothing (first task).
 - Produces: a building `esp32dev` environment and a `native` environment ready to run Catch2 tests (no test files yet — Task 2 adds the first one). Later tasks assume `platformio.ini`, `lib/Catch2/`, and `test/test_custom_runner.py` exist exactly as this task leaves them.
 
-- [ ] **Step 1: Create `platformio.ini`**
+- [x] **Step 1: Create `platformio.ini`**
 
 ```ini
 [platformio]
@@ -67,7 +67,7 @@ test_build_src = false
 build_flags = -std=c++17
 ```
 
-- [ ] **Step 2: Create `.gitignore`**
+- [x] **Step 2: Create `.gitignore`**
 
 ```gitignore
 # PlatformIO build output
@@ -144,7 +144,7 @@ __pycache__/
 !.gitkeep
 ```
 
-- [ ] **Step 3: Create `src/main.cpp`**
+- [x] **Step 3: Create `src/main.cpp`**
 
 ```cpp
 #include <Arduino.h>
@@ -158,7 +158,7 @@ void loop()
 }
 ```
 
-- [ ] **Step 4: Create PlatformIO placeholder READMEs**
+- [x] **Step 4: Create PlatformIO placeholder READMEs**
 
 `include/README`:
 ```
@@ -176,7 +176,7 @@ PlatformIO will compile them to static libraries and link into the executable fi
 This directory is intended for PlatformIO Test Runner and project tests.
 ```
 
-- [ ] **Step 5: Create empty hexagonal-layer folders**
+- [x] **Step 5: Create empty hexagonal-layer folders**
 
 Create these empty files (content is a single newline) so git tracks the otherwise-empty directories:
 - `lib/McsCore/src/domain/.gitkeep`
@@ -186,7 +186,7 @@ Create these empty files (content is a single newline) so git tracks the otherwi
 - `test/support/.gitkeep`
 - `internal_documents/.gitkeep`
 
-- [ ] **Step 6: Vendor Catch2 3.7.1**
+- [x] **Step 6: Vendor Catch2 3.7.1**
 
 Copy the entire vendored Catch2 library from the template project — this is third-party test-framework code, not something to hand-type:
 
@@ -200,20 +200,20 @@ diff -rq "/d/Development/MaltbeeController/lib/Catch2" "/d/Development/MaltbeeTu
 ```
 Expected: no output (directories identical).
 
-- [ ] **Step 7: Copy the custom Catch2 test runner**
+- [x] **Step 7: Copy the custom Catch2 test runner**
 
 ```bash
 cp "/d/Development/MaltbeeController/test/test_custom_runner.py" "/d/Development/MaltbeeTurnoutController/test/test_custom_runner.py"
 ```
 
-- [ ] **Step 8: Copy the `pioTest` Claude Code skill**
+- [x] **Step 8: Copy the `pioTest` Claude Code skill**
 
 ```bash
 mkdir -p "/d/Development/MaltbeeTurnoutController/.claude/skills/pioTest"
 cp "/d/Development/MaltbeeController/.claude/skills/pioTest/SKILL.md" "/d/Development/MaltbeeTurnoutController/.claude/skills/pioTest/SKILL.md"
 ```
 
-- [ ] **Step 9: Write `CLAUDE.md`**
+- [x] **Step 9: Write `CLAUDE.md`**
 
 ```markdown
 # CLAUDE.md
@@ -269,7 +269,7 @@ Hexagonal architecture, same discipline as the MaltbeeController project this wa
 - **Explicit state**: state changes go through methods that enforce valid transitions, not direct field mutation.
 ```
 
-- [ ] **Step 10: Write `README.md`**
+- [x] **Step 10: Write `README.md`**
 
 ```markdown
 # Maltbee Turnout Controller
@@ -298,12 +298,12 @@ pio device monitor
 Scaffolding in progress. Domain design (Tortoise driving, MQTT/JMRI communication) is being developed separately and will be incorporated incrementally — see `docs/esp32-hal-class-list.md` and `docs/superpowers/`.
 ```
 
-- [ ] **Step 11: Verify the scaffold builds**
+- [x] **Step 11: Verify the scaffold builds**
 
 Run: `pio run -e esp32dev`
 Expected: `SUCCESS` — the placeholder `main.cpp` compiles for the ESP32 target with no errors.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add platformio.ini .gitignore src/main.cpp include/README lib/README test/README lib/McsCore lib/Catch2 test/support/.gitkeep test/test_custom_runner.py internal_documents/.gitkeep .claude/skills/pioTest/SKILL.md CLAUDE.md README.md
@@ -323,7 +323,7 @@ git commit -m "Scaffold PlatformIO project (esp32dev + native envs, empty hexago
 - Consumes: nothing.
 - Produces: `class Clock { virtual unsigned long nowMillis() const = 0; };` and `class FakeClock : public Clock` with `nowMillis() const`, `void setNow(unsigned long milliseconds)`, `void advanceBy(unsigned long milliseconds)`. Later tasks/domain code depend on this exact `Clock` interface for all timing.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `test/test_fake_clock/test_main.cpp`:
 
@@ -371,12 +371,12 @@ TEST_CASE("advanceBy can be called multiple times")
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pio test -e native -f test_fake_clock`
 Expected: FAIL — compile error, `support/FakeClock.h` does not exist (`ports/Clock.h` doesn't exist either).
 
-- [ ] **Step 3: Write the `Clock` port**
+- [x] **Step 3: Write the `Clock` port**
 
 Create `lib/McsCore/src/ports/Clock.h`:
 
@@ -391,7 +391,7 @@ public:
 };
 ```
 
-- [ ] **Step 4: Write `FakeClock`**
+- [x] **Step 4: Write `FakeClock`**
 
 Create `test/support/FakeClock.h`:
 
@@ -423,17 +423,17 @@ private:
 };
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `pio test -e native -f test_fake_clock`
 Expected: PASS — 4 test cases, 0 failures.
 
-- [ ] **Step 6: Run the full native suite to check for regressions**
+- [x] **Step 6: Run the full native suite to check for regressions**
 
 Run: `pio test -e native`
 Expected: PASS — only `test_fake_clock` exists so far, 0 failures.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/McsCore/src/ports/Clock.h test/support/FakeClock.h test/test_fake_clock/test_main.cpp
@@ -453,7 +453,7 @@ git commit -m "Add Clock port and FakeClock test double"
 - Consumes: nothing (independent of `Clock`).
 - Produces: `class DigitalOutput { virtual void set(bool state) = 0; };` and `class FakeDigitalOutput : public DigitalOutput` with `void set(bool state) override`, `bool isSet() const`, `int setCallCount() const`. Later Tortoise-driver adapters depend on this exact `DigitalOutput` interface.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `test/test_fake_digital_output/test_main.cpp`:
 
@@ -501,12 +501,12 @@ TEST_CASE("set() records how many times it was called")
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pio test -e native -f test_fake_digital_output`
 Expected: FAIL — compile error, `support/FakeDigitalOutput.h` does not exist.
 
-- [ ] **Step 3: Write the `DigitalOutput` port**
+- [x] **Step 3: Write the `DigitalOutput` port**
 
 Create `lib/McsCore/src/ports/DigitalOutput.h`:
 
@@ -521,7 +521,7 @@ public:
 };
 ```
 
-- [ ] **Step 4: Write `FakeDigitalOutput`**
+- [x] **Step 4: Write `FakeDigitalOutput`**
 
 Create `test/support/FakeDigitalOutput.h`:
 
@@ -555,17 +555,17 @@ private:
 };
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `pio test -e native -f test_fake_digital_output`
 Expected: PASS — 4 test cases, 0 failures.
 
-- [ ] **Step 6: Run the full native suite to check for regressions**
+- [x] **Step 6: Run the full native suite to check for regressions**
 
 Run: `pio test -e native`
 Expected: PASS — `test_fake_clock` and `test_fake_digital_output`, 0 failures.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/McsCore/src/ports/DigitalOutput.h test/support/FakeDigitalOutput.h test/test_fake_digital_output/test_main.cpp
@@ -585,7 +585,7 @@ git commit -m "Add DigitalOutput port and FakeDigitalOutput test double"
 - Consumes: nothing (independent of `Clock` and `DigitalOutput`).
 - Produces: `class PwmOutput { virtual void writeDutyCycle(double percent) = 0; };` and `class FakePwmOutput : public PwmOutput` with `void writeDutyCycle(double percent) override`, `double lastDutyCycle() const`, `int writeCallCount() const`. Later Tortoise-driver adapters depend on this exact `PwmOutput` interface.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `test/test_fake_pwm_output/test_main.cpp`:
 
@@ -632,12 +632,12 @@ TEST_CASE("writeDutyCycle records how many times it was called")
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pio test -e native -f test_fake_pwm_output`
 Expected: FAIL — compile error, `support/FakePwmOutput.h` does not exist.
 
-- [ ] **Step 3: Write the `PwmOutput` port**
+- [x] **Step 3: Write the `PwmOutput` port**
 
 Create `lib/McsCore/src/ports/PwmOutput.h`:
 
@@ -652,7 +652,7 @@ public:
 };
 ```
 
-- [ ] **Step 4: Write `FakePwmOutput`**
+- [x] **Step 4: Write `FakePwmOutput`**
 
 Create `test/support/FakePwmOutput.h`:
 
@@ -686,17 +686,17 @@ private:
 };
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `pio test -e native -f test_fake_pwm_output`
 Expected: PASS — 4 test cases, 0 failures.
 
-- [ ] **Step 6: Run the full native suite to check for regressions**
+- [x] **Step 6: Run the full native suite to check for regressions**
 
 Run: `pio test -e native`
 Expected: PASS — `test_fake_clock`, `test_fake_digital_output`, and `test_fake_pwm_output`, 0 failures.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/McsCore/src/ports/PwmOutput.h test/support/FakePwmOutput.h test/test_fake_pwm_output/test_main.cpp
