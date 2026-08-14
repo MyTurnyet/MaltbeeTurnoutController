@@ -1,0 +1,51 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Committing
+
+Always use the `/arlo-commits` skill when committing changes in this repository — do not hand-write commit messages or `git commit` directly. Invoke it whenever the user asks for a commit, even if they don't name the skill explicitly.
+
+## Project Purpose
+
+Maltbee Turnout Controller — ESP32-WROOM-32 firmware that drives up to 8 Tortoise slow-motion switch machines per board, commanded via JMRI over MQTT. Domain/application design (Tortoise driver behavior, MQTT/JMRI adapters, turnout state model) is being developed separately and brought into this repo incrementally. See `docs/esp32-hal-class-list.md` for the planned hardware abstraction layer, and `docs/superpowers/specs/` / `docs/superpowers/plans/` for design and implementation history.
+
+## Commands
+
+```bash
+pio test -e native                  # run host-native unit tests (no hardware needed)
+pio run -e esp32dev                 # build the firmware for the ESP32-WROOM-32
+pio run -e esp32dev --target upload
+pio device monitor                  # serial monitor, 115200 baud
+```
+
+To run a single native test file:
+```bash
+pio test -e native -f test_<name>
+```
+
+There is no `native` build target for `src/` (`test_build_src = false` in `platformio.ini`) — native test binaries only compile `test/` plus whatever `lib/` code they include, not `main.cpp`.
+
+## Architecture
+
+Hexagonal architecture, same discipline as the MaltbeeController project this was scaffolded from. The critical rule: **domain and application code must compile and run under the `native` PlatformIO environment without `Arduino.h`.** Hardware-specific code is isolated behind ports (interfaces) and only implemented in adapters.
+
+- **Ports** (`lib/McsCore/src/ports/`) are pure interfaces the domain/application depend on.
+- **Adapters** (`lib/McsCore/src/adapters/`) implement ports against real ESP32 hardware, guarded with `#ifdef ARDUINO` so they don't break the native build. Hand-written test doubles (`test/support/`) implement the same ports for native unit tests — no mocking framework.
+- **`src/main.cpp` is the composition root only** — it wires adapters/domain/application objects together, calls setup once, and calls non-blocking `update()`/`poll()` methods from `loop()`. No business logic lives here.
+- **No blocking calls** (`delay()`) in domain/application code — timing goes through the `Clock` port.
+- Classes are built **needs-driven**, not speculatively — see `docs/esp32-hal-class-list.md`'s "Scope Note" section for why the full HAL class list exists as a reference but isn't implemented up front.
+
+### Current source layout
+
+- `lib/McsCore/src/ports/` — port interfaces (`Clock`, `DigitalOutput`, `PwmOutput`; more added only as a real need arises)
+- `lib/McsCore/src/domain/`, `lib/McsCore/src/application/`, `lib/McsCore/src/adapters/` — empty until real classes are needed
+- `test/support/` — hand-written fakes (`FakeClock`, `FakeDigitalOutput`, `FakePwmOutput`, ...)
+- `test/test_<name>/test_main.cpp` — Catch2 test binaries
+
+## Engineering Principles
+
+- **TDD**: write a failing native test first, implement the minimum to pass, refactor only while green.
+- **Dependency inversion**: domain depends on ports, adapters depend on domain-owned interfaces — never the reverse. No statics/singletons; everything is constructed and injected via the composition root.
+- **Single responsibility, small interfaces**: 1–2 methods per port, one job per class.
+- **Explicit state**: state changes go through methods that enforce valid transitions, not direct field mutation.
