@@ -23,4 +23,4 @@ On Windows, if `pio test -e native` builds but the test binary fails to run, mak
 
 ## Status
 
-Foundation hardware-abstraction-layer ports are in place, built needs-driven and TDD'd against the native test environment: `Clock`, `DigitalOutput`, `PwmOutput` (`lib/McsCore/src/ports/`), each with a hand-written fake (`test/support/`). No ESP32 hardware adapters, domain classes, or MQTT/JMRI communication yet — those come next as real needs arise. See `docs/esp32-hal-class-list.md` for the longer-term HAL reference and `docs/superpowers/` for design and implementation history.
+Foundation hardware-abstraction-layer ports are in place, built needs-driven and TDD'd against the native test environment: `Clock`, `DigitalOutput`, `PwmOutput` (`lib/McsCore/src/ports/`), each with a hand-written fake (`test/support/`). No ESP32 hardware adapters, domain classes, or MQTT/JMRI communication yet — those come next as real needs arise. See `docs/software-class-list.md` for the concrete turnout-controller class breakdown and `docs/superpowers/` for design and implementation history.

@@ -8,7 +8,7 @@ Always use the `/arlo-commits` skill when committing changes in this repository 
 
 ## Project Purpose
 
-Maltbee Turnout Controller — ESP32-WROOM-32 firmware that drives up to 8 Tortoise slow-motion switch machines per board, commanded via JMRI over MQTT. Domain/application design (Tortoise driver behavior, MQTT/JMRI adapters, turnout state model) is being developed separately and brought into this repo incrementally. See `docs/esp32-hal-class-list.md` for the planned hardware abstraction layer, and `docs/superpowers/specs/` / `docs/superpowers/plans/` for design and implementation history.
+Maltbee Turnout Controller — ESP32-WROOM-32 firmware that drives up to 8 Tortoise slow-motion switch machines per board, commanded via JMRI over MQTT. Domain/application design (Tortoise driver behavior, MQTT/JMRI adapters, turnout state model) is being developed separately and brought into this repo incrementally. See `docs/software-class-list.md` for the concrete value objects/ports/domain/adapter class breakdown (source of truth, synced from the design doc), and `docs/superpowers/specs/` / `docs/superpowers/plans/` for design and implementation history.
 
 ## Commands
 
@@ -36,7 +36,7 @@ Hexagonal architecture, same discipline as the MaltbeeController project this wa
 - **Adapters** (`lib/McsCore/src/adapters/`) implement ports against real ESP32 hardware, guarded with `#ifdef ARDUINO` so they don't break the native build. Hand-written test doubles (`test/support/`) implement the same ports for native unit tests — no mocking framework.
 - **`src/main.cpp` is the composition root only** — it wires adapters/domain/application objects together, calls setup once, and calls non-blocking `update()`/`poll()` methods from `loop()`. No business logic lives here.
 - **No blocking calls** (`delay()`) in domain/application code — timing goes through the `Clock` port.
-- Classes are built **needs-driven**, not speculatively — see `docs/esp32-hal-class-list.md`'s "Scope Note" section for why the full HAL class list exists as a reference but isn't implemented up front.
+- Classes are built **needs-driven**, following the Build Order in `docs/software-class-list.md` — value objects first, then the smallest pure-logic domain class (`Debouncer`), working up to adapters and the composition root last.
 
 ### Current source layout
 
