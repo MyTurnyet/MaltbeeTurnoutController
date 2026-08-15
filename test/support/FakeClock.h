@@ -1,25 +1,26 @@
 #pragma once
 
 #include "ports/Clock.h"
+#include "domain/Duration.h"
 
 class FakeClock : public Clock
 {
 public:
-    unsigned long nowMillis() const override
+    Instant now() const override
     {
-        return currentMillis_;
+        return currentInstant_;
     }
 
-    void setNow(unsigned long milliseconds)
+    void setNow(Instant instant)
     {
-        currentMillis_ = milliseconds;
+        currentInstant_ = instant;
     }
 
-    void advanceBy(unsigned long milliseconds)
+    void advanceBy(Duration duration)
     {
-        currentMillis_ += milliseconds;
+        currentInstant_ = currentInstant_ + duration;
     }
 
 private:
-    unsigned long currentMillis_ = 0;
+    Instant currentInstant_ = Instant(0);
 };

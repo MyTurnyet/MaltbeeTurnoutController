@@ -1,8 +1,10 @@
 #pragma once
 
+#include "domain/Instant.h"
+
 class Clock
 {
 public:
     virtual ~Clock() = default;
-    virtual unsigned long nowMillis() const = 0;
+    virtual Instant now() const = 0;
 };
