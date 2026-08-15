@@ -60,6 +60,9 @@ desktop.ini
 # Visual Studio Code settings, if used later
 .vscode/
 
+# Local git worktrees (EnterWorktree / git worktree add scratch space)
+.claude/worktrees/
+
 # Local environment files
 .env
 .env.*
