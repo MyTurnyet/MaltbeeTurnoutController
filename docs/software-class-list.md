@@ -1,6 +1,6 @@
 # ESP32 Turnout Controller — Software Class List
 
-> Source of truth: [ESP32 Turnout Controller — Software Class List](https://docs.google.com/document/d/1pA2lRrbFkzAZD5v-xEVw-N_5N47QN5GiCVkWwlXZWMM/edit) (Google Doc). Pulled into the repo on 2026-08-15 so it travels with the code; re-sync this file if the doc changes.
+> Source of truth: [ESP32 Turnout Controller — Software Class List](https://docs.google.com/document/d/1jbSANH3e8IK4dgGmmz0WCU5wKDMwLRFA2LSdcXLwdoc/edit) (Google Doc). Pulled into the repo on 2026-08-15, re-synced same day to pick up the Node Configuration/Commissioning and Wireless Commissioning sections (superseding an earlier revision at doc id `1pA2lRrbFkzAZD5v-xEVw-N_5N47QN5GiCVkWwlXZWMM`). Re-sync this file if the doc changes again.
 
 Companion to the project notes and the breadboard prototype doc. This
 **supersedes** the earlier generic-HAL draft (`docs/esp32-hal-class-list.md`,
@@ -88,7 +88,7 @@ the test moves it.
 **Note:** this table does not include `PwmOutput` — the currently-scaffolded
 `lib/McsCore/src/ports/PwmOutput.h` predates this design and isn't part of it.
 Tortoise stall motors are driven via simple direction-level `DigitalOutput`,
-not PWM speed control. See [Reconciling the scaffolded ports](#reconciling-the-scaffolded-ports-with-this-design) below.
+not PWM speed control. See [Reconciling the scaffolded code with this design](#reconciling-the-scaffolded-code-with-this-design) below.
 
 ## Ports — Driving Side
 
@@ -256,9 +256,15 @@ not that a mocking library is needed.
   publishes nothing (internal distinction); Closed/Thrown publish
   CLOSED/THROWN; Faulted/Unknown publish UNKNOWN. Published only on
   transition, not per tick.
-- **Node identity:** one firmware image for every node; identity set via a
-  serial command (id 2) at the bench, stored behind `ConfigStore`. Avoids
-  per-node builds and meaningless MAC-derived identity.
+- **Node identity:** one firmware image for every node; identity is a plain
+  config field (1–16, chosen from a dropdown during wireless commissioning —
+  see [Wireless Commissioning & Field Identification](#wireless-commissioning--field-identification)
+  below), stored behind `ConfigStore`. Avoids per-node builds. The device's
+  MAC address is used only transiently, to name the temporary setup AP
+  before a node has an assigned id. *(Revises the earlier "bench serial `id`
+  command" decision — that workflow still exists for bench/manufacturing use,
+  see [Node Configuration & Commissioning](#node-configuration--commissioning),
+  but is no longer the primary field workflow.)*
 - **Turnout numbering:** node-prefixed (Node N owns N01–N16) rather than flat
   blocks — readable without arithmetic, and growth doesn't force
   renumbering.
@@ -282,6 +288,15 @@ Each step is test-first, everything before it already green:
 11. Everything above runs on the host — only now write adapters
 12. `ControllerNode` and `main.cpp`
 
+**Status vs. this Build Order:** steps 1–3 are done (see
+[Reconciling the scaffolded code with this design](#reconciling-the-scaffolded-code-with-this-design)).
+Step 1 shipped only the two value objects `Debouncer` actually needed
+(`Instant`, `Duration`, `Level`) — `TurnoutPosition`/`TurnoutState` are
+deferred to whichever of steps 5–9 first needs them, per this project's
+needs-driven building principle (`CLAUDE.md`). Steps 4 onward, plus the
+Node Configuration/Commissioning and Wireless Commissioning work below, are
+not yet started.
+
 ## Still Open (not yet blocking class design)
 
 | # | Item |
@@ -290,7 +305,7 @@ Each step is test-first, everything before it already green:
 | 10.2 | Does a confirming payload cause JMRI to fire listeners twice? |
 | 10.3 | Does JMRI accept UNKNOWN as an inbound payload? |
 | 10.4 | Send/receive MQTT topics: same, or split? |
-| 10.5 | Full serial commissioning command set beyond `id` |
+| 10.5 | Full serial commissioning command set beyond `id` — see [Node Configuration & Commissioning](#node-configuration--commissioning) below |
 | 10.6 | `millis()` 49-day rollover handling in `ArduinoClock` |
 
 These are answerable via `mosquitto_sub` + the JMRI turnout table, with no
@@ -298,24 +313,221 @@ hardware required, and don't change any class in the list above.
 
 ---
 
-## Reconciling the scaffolded ports with this design
+## Node Configuration & Commissioning
+
+Resolves open item 10.5. Covers how a single firmware image becomes a
+*specific* node — its identity, WiFi, broker address, and all eight
+`TurnoutConfig`s — and how that configuration gets created and updated in
+the field without recompiling.
+
+### New Value Object: `NodeConfig`
+
+```cpp
+struct NodeConfig {
+    NodeId id;
+    WifiCredentials wifi;      // ssid, password
+    BrokerAddress broker;      // host, port
+    array<TurnoutConfig, 8> turnouts;
+};
+```
+
+Immutable, like every other value object in this design. Updates go through
+`with...()` methods that return a new instance (`withId(NodeId)`,
+`withWifi(WifiCredentials)`, `withTurnout(index, TurnoutConfig)`) rather than
+mutating in place.
+
+- `NodeConfig::factoryDefault()` — a pure function (not shared mutable
+  state, so it doesn't violate "no statics") returning what a brand-new,
+  uncommissioned node loads.
+- `validate(): vector<ConfigError>` — pure function catching pin conflicts
+  (two turnouts claiming GPIO 13), an out-of-range node id, etc., before
+  anything is saved. Fully host-testable with no hardware.
+
+This sits directly on top of the existing `ConfigStore` port —
+`NvsConfigStore` now persists a `NodeConfig` rather than a single
+`TurnoutConfig`.
+
+### Commissioning Classes
+
+Same domain/adapter split as the rest of the system.
+
+| Class | Layer | Responsibility |
+|---|---|---|
+| `CommandLineParser` | Domain (pure) | Parses a raw text line (e.g. `"turnout 1 pin 13 fb 36 orientation normal"`) into a `ParsedCommand` value. No I/O — trivially host-tested with plain strings in, enum/struct out. |
+| `CommissioningSession` | Domain | Holds a draft `NodeConfig`, applies a `ParsedCommand` to produce an updated draft, decides when to call `ConfigStore::save()`. Tested with a scripted list of commands and a `CapturingConfigStore` double — no serial hardware needed. |
+| `SerialCommissioningAdapter` | Adapter | Reads bytes off `UartPort`, buffers into lines, hands each line to the parser → session, writes responses back. Thin — just plumbing, per the "any if here is a smell" rule for adapters. |
+
+### Command Set
+
+| Command | Effect |
+|---|---|
+| `id <n>` | Set node id |
+| `wifi <ssid> <password>` | Set WiFi credentials |
+| `broker <host> <port>` | Set MQTT broker address |
+| `turnout <n> pin <gpio> fb <gpio> orientation <normal\|inverted> settle <ms> timeout <ms>` | Set one turnout's config |
+| `show` | Print the current draft config |
+| `save` | Persist the draft via `ConfigStore` |
+| `reboot` | Restart so the saved config takes effect |
+
+### Why `reboot`, Not Live-Apply
+
+The object graph is built once at startup and never reallocated ("no
+dynamic allocation after boot"). Commissioning deliberately does **not**
+hot-swap a live `Turnout` or `TurnoutRegistry`. The session only writes a
+draft to NVS — nothing takes effect until `ControllerNode`'s constructor
+runs again via a soft reboot (`ESP.restart()`), not a live re-wire. This
+keeps the composition root's "build once" guarantee intact and avoids an
+entire class of "config changed under a running object" bugs.
+
+### Per-Node Workflow
+
+1. Plug into USB, open a serial terminal.
+2. `show` — view current config (factory defaults on a fresh board).
+3. Set what's needed: `id 3`, `wifi ...`, `broker ...`, `turnout 1 pin 13 fb 36 ...` × 8.
+4. `save` — writes the validated `NodeConfig` via `NvsConfigStore`.
+5. `reboot` — `ControllerNode` rebuilds from the new config.
+
+One firmware image serves every node; this commissioning step is what
+differentiates them — the existing `id 2` example generalized to the whole
+config surface, not just node id.
+
+**Note:** the workflow above (USB serial) remains useful at the bench for
+manufacturing/testing, but for an end customer with no programming
+background, use the wireless workflow below instead — it reuses the same
+`CommissioningSession` and `ParsedCommand` domain classes, just fed from a
+different adapter.
+
+---
+
+## Wireless Commissioning & Field Identification
+
+Addresses two problems that come up specifically when these nodes are built
+by someone else and installed by a non-technical customer:
+
+1. Configuring WiFi/broker/turnout settings without a serial terminal.
+2. Telling nodes apart physically once several are installed under the
+   layout.
+
+No new hardware is required — this reuses the ESP32 dev board's existing
+BOOT button and status LED.
+
+### Entering Setup Mode
+
+Hold **BOOT** while powering on. The node skips normal startup and instead:
+
+1. Starts its own WiFi access point named `Tortoise-Setup-<last 4 hex digits of MAC>`
+   (e.g. `Tortoise-Setup-3F2A`). The MAC is used here only because the node
+   has no assigned node id yet — it's never used as identity once
+   configured.
+2. Runs a captive portal: connecting a phone/laptop to that AP auto-opens a
+   setup page, same pattern as consumer WiFi devices (Shelly, Tasmota,
+   ESPHome, etc.).
+3. Serves a form: home WiFi SSID/password, broker address, a **node id
+   dropdown (1–16)**, and per-turnout pin/orientation fields (optional if
+   the customer is wiring to your standard harness with defaults).
+4. On submit, the node validates and reboots into normal operation with the
+   new config.
+
+If several new boards are being set up at once, the customer identifies
+*which* physical board they're talking to by its blinking "setup mode" LED
+and the AP name shown in their WiFi list — both trace back to a specific
+board without needing to already know its id.
+
+### New Classes
+
+| Class | Layer | Responsibility |
+|---|---|---|
+| `SetupModeTrigger` | Port | `bool requested()` — was BOOT held through the boot window? |
+| `ButtonSetupModeTrigger` | Adapter | Reads the BOOT pin during `ControllerNode`'s construction |
+| `CaptivePortalServer` | Adapter | Runs the AP, DNS capture, and HTTP server; serves the setup page |
+| `WebFormCommissioningAdapter` | Adapter | Parses HTTP POST fields into the same `ParsedCommand` values used by `CommandLineParser`, hands them to `CommissioningSession` |
+| `DeviceIdentity` | Port | `MacAddress mac()` — read-only hardware identity, used only for setup-AP naming |
+| `EspDeviceIdentity` | Adapter | Reads the ESP32's burned-in MAC |
+
+`WebFormCommissioningAdapter` and `SerialCommissioningAdapter` are siblings —
+both translate an external input format into `ParsedCommand`s for the same
+`CommissioningSession`. The domain doesn't know or care which one was used.
+
+### Field Identification: Blink-Out
+
+A **short press** of BOOT during normal operation (not held through
+power-up, so it doesn't trigger setup mode) makes the status LED blink the
+node's id N times, then pause and repeat for a few seconds. Lets someone
+standing under the layout confirm "this is node 4" without a phone, once a
+node has actually been assigned an id.
+
+Reuses the same `SetupModeTrigger` GPIO read, distinguished by hold
+duration — short press vs. held-through-boot — so no new physical input is
+needed.
+
+| Class | Layer | Responsibility |
+|---|---|---|
+| `IdentifyRequestTrigger` | Port | `bool requested()` — was BOOT short-pressed this tick? |
+| `ButtonIdentifyRequestTrigger` | Adapter | Same physical pin as `ButtonSetupModeTrigger`, different timing window |
+| `BlinkOutIdentifier` | Domain | Given a `NodeId` and a `Clock`, produces the on/off `Level` sequence for the LED over time. Pure — testable with `ManualClock`, no LED hardware needed. |
+
+### Duplicate Node ID Detection
+
+A dropdown makes a duplicate id easier to create by accident than the old
+rotary switch did (no physical board-by-board differentiation forcing the
+installer to notice). Caught via MQTT rather than in the dropdown itself,
+since only the broker sees all nodes at once:
+
+- On boot, before fully starting, a node publishes a **retained** presence
+  message to `node/<id>/status = online` and **subscribes** to that same
+  topic first.
+- If a retained message from a *different* boot session already claims that
+  id, the node refuses to fully come online and blinks an error pattern
+  (distinct from the identify blink) instead.
+- This also gives a live "which nodes are online" view for free —
+  `mosquitto_sub -t 'node/+/status'` — independent of JMRI.
+
+| Class | Layer | Responsibility |
+|---|---|---|
+| `NodePresenceReporter` | Port | `void announce(NodeId)` — publish retained presence |
+| `MqttNodePresenceReporter` | Adapter | Implements it via `MqttLink`, sets the retain flag |
+| `NodeIdCollisionGuard` | Domain | Given the current node's id and an observed presence message, decides collision vs. self vs. unrelated. Pure — testable with plain values, no broker needed. |
+
+### Updated Per-Customer Workflow
+
+1. Power on with BOOT held → node enters setup mode, starts its own AP
+   named from its MAC.
+2. Customer connects phone to that AP, captive portal opens automatically.
+3. Fill in WiFi, broker, node id (1–16 dropdown), turnout settings → submit.
+4. Node validates, saves, reboots, announces presence over MQTT (and
+   refuses to fully start if another node already claims that id).
+5. To confirm identity later: short-press BOOT, count the LED blinks.
+
+No serial terminal, no typing commands, no programming knowledge required.
+
+---
+
+## Reconciling the scaffolded code with this design
 
 The HAL-foundation scaffolding work (`docs/superpowers/plans/2026-08-13-hal-foundation-scaffold.md`)
-landed three ports before this design doc existed in the repo. Comparing them
-against the table above:
+landed three ports before this design doc existed in the repo, and the
+value-objects-and-`Debouncer` plan (`docs/superpowers/plans/2026-08-15-turnout-value-objects-and-debouncer.md`)
+has since implemented Build Order steps 1–3. Current state as of this sync:
 
-- **`Clock`** (`lib/McsCore/src/ports/Clock.h`): currently
-  `virtual unsigned long nowMillis() const = 0`. This design wants
-  `Instant now()`. `Instant`/`Duration` don't exist yet — introducing them is
-  Build Order step 1, and `Clock`/`FakeClock` need a follow-up change to
-  return `Instant` instead of a raw `unsigned long` once they do.
-- **`DigitalOutput`** (`lib/McsCore/src/ports/DigitalOutput.h`): currently
-  `virtual void set(bool state) = 0`. This design wants `void write(Level)`.
-  Same story — `Level` is a Build Order step 1 value object; the port
-  signature changes once it exists.
-- **`PwmOutput`** (`lib/McsCore/src/ports/PwmOutput.h`): **not part of this
-  design at all.** Tortoise motors are direction-driven, not speed-driven.
-  This port (and `FakePwmOutput`) was built ahead of the concrete domain
-  design and currently has no consumer in the class list above. Left in
-  place for now since it does no harm sitting unused, but it's a candidate
-  for removal rather than something to keep building on.
+- **`Clock`** (`lib/McsCore/src/ports/Clock.h`): **migrated**, matches this
+  design — `virtual Instant now() const = 0`.
+- **`Instant` / `Duration` / `Level`** (`lib/McsCore/src/domain/`):
+  **implemented**, matching this design's Value Objects table. Only the two
+  value objects `Debouncer` actually needed were built — `TurnoutPosition`
+  and `TurnoutState` are intentionally not yet implemented (needs-driven,
+  not speculative).
+- **`Debouncer`** (`lib/McsCore/src/domain/Debouncer.h`): **implemented**,
+  matches this design's signature (`sample(Level, Instant)`, `stable() const`).
+- **`DigitalOutput`** (`lib/McsCore/src/ports/DigitalOutput.h`): **not yet
+  migrated** — still `virtual void set(bool state) = 0`. This design wants
+  `void write(Level)`. `Level` now exists (unlike at the last sync), so
+  nothing blocks this migration except that no class currently in the repo
+  consumes `DigitalOutput` — it'll naturally get migrated alongside whichever
+  Build Order step first needs it (`FeedbackSensor` reads via `DigitalInput`
+  first; `Turnout`/an ESP32 adapter is the more likely trigger for
+  `DigitalOutput`).
+- **`PwmOutput`** (`lib/McsCore/src/ports/PwmOutput.h`): **still not part of
+  this design.** Tortoise motors are direction-driven, not speed-driven.
+  This port (and `FakePwmOutput`) has no consumer anywhere in the class list
+  above and remains a candidate for removal rather than something to keep
+  building on.
