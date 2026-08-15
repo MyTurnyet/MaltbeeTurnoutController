@@ -41,7 +41,8 @@ Hexagonal architecture, same discipline as the MaltbeeController project this wa
 ### Current source layout
 
 - `lib/McsCore/src/ports/` — port interfaces (`Clock`, `DigitalOutput`, `PwmOutput`; more added only as a real need arises)
-- `lib/McsCore/src/domain/`, `lib/McsCore/src/application/`, `lib/McsCore/src/adapters/` — empty until real classes are needed
+- `lib/McsCore/src/domain/` — value objects and pure domain classes (`Duration`, `Instant`, `Level`, `Debouncer`; more added only as a real need arises, following the Build Order in `docs/software-class-list.md`)
+- `lib/McsCore/src/application/`, `lib/McsCore/src/adapters/` — empty until real classes are needed
 - `test/support/` — hand-written fakes (`FakeClock`, `FakeDigitalOutput`, `FakePwmOutput`, ...)
 - `test/test_<name>/test_main.cpp` — Catch2 test binaries
 
