@@ -4,7 +4,7 @@
 
 **Goal:** Implement `ControllerNode` (Build Order 12) and wire it into `src/main.cpp` for real, so the ESP32-WROOM-32 firmware is flashable and functional for the first time.
 
-**Architecture:** `ControllerNode` is the single documented static-object exception to "no statics" — it constructs the whole object graph once (config → per-turnout `EspDigitalOutput`/`EspDigitalInput` → `WiFiLink`/`MqttLink` → `TurnoutRegistry` owning 8 `Turnout`s → `MqttCommandSource`/`MqttPositionReporter`) and exposes only `begin()`/`tick()`. `main.cpp` becomes a true composition root: one file-scope `ControllerNode` instance, `setup()` calls `begin()`, `loop()` calls `tick()`, no other logic.
+**Architecture:** `ControllerNode` is the single documented static-object exception to "no statics" — it constructs the whole object graph once (config → per-turnout `EspDigitalOutput`/`EspDigitalInput` → `WiFiLink`/`MqttLink` → `TurnoutRegistry` owning 8 `Turnout`s → `MqttCommandSource`/`MqttPositionReporter`) and exposes only `begin()`/`tick()`. `main.cpp` becomes a true composition root: one `ControllerNode` instance (a function-local static constructed inside `setup()` — see Task 1 Step 2's correction note for why not file-scope), `setup()` calls `begin()`, `loop()` calls `tick()` via a pointer to it, no other logic.
 
 **Tech Stack:** PlatformIO, `esp32dev` env (C++17, `espressif32` platform, `arduino` framework), `knolleary/PubSubClient@^2.8`.
 
