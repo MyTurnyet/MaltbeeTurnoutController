@@ -28,8 +28,13 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Add TurnoutState/TurnoutMotion implementation plan | ✅ Done | Commit `642ef7a`. |
 | `TurnoutState` value object | ✅ Done | Commit `26521f7`. Bare `enum class { Closed, Thrown, Moving, Unknown }`. |
 | `TurnoutMotion` state machine (Build Order 7) | ✅ Done | Commit `64cb81b`. All 15 transition-table tests independently hand-traced against the committed code by an Opus review — zero findings. |
+| Add TurnoutId/PositionReporter/DigitalOutput-migration/Turnout plan | ✅ Done | Commit `f526e03`. |
+| `TurnoutId` value object | ✅ Done | Commit `ae051b3`. Small wrapper, same style as `Duration`/`Instant`. |
+| Migrate `DigitalOutput`/`FakeDigitalOutput` onto `Level` | ✅ Done | Commit `212ab68`. Replaces `set(bool)`/`isSet()` with `write(Level)`/`level()`; closes the last "Known scaffolding debt" item besides unused `PwmOutput`. |
+| `PositionReporter` port + `FakePositionReporter` | ✅ Done | Commit `9faa870`. Driven-side port; hand-written fake records `(TurnoutId, TurnoutState)` reports in order. |
+| `Turnout` composition class (Build Order 8) | ✅ Done | Commit `45deaa4`. Composes `DigitalOutput&`/`FeedbackSensor`/`TurnoutMotion`/`PositionReporter&` via DI (no `TurnoutConfig` yet — needs-driven, see plan). Reports only on state change; first `tick()` always reports the starting state. |
 
-Build Order steps 1–7 (`docs/software-class-list.md`) are complete. All 14
+Build Order steps 1–8 (`docs/software-class-list.md`) are complete. All 17
 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
@@ -40,8 +45,7 @@ have no blockers and can be picked up any time.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 12 | Turnout composition class (Build Order 8) | ⬜ Pending | — (unblocked, #11 done) |
-| 13 | TurnoutRegistry (Build Order 9) | ⬜ Pending | #12 |
+| 13 | TurnoutRegistry (Build Order 9) | ⬜ Pending | — (unblocked, #12 done) |
 | 14 | TopicScheme + PayloadCodec (Build Order 10) | ⬜ Pending | — |
 | 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | #13, #14 |
 | 16 | ControllerNode + main.cpp composition root (Build Order 12) | ⬜ Pending | #15 |
@@ -51,12 +55,6 @@ have no blockers and can be picked up any time.
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#12 — Turnout composition class (Build Order 8)**
-Composes `TurnoutConfig` + `DigitalOutput` + `FeedbackSensor` +
-`TurnoutMotion`. `moveTo(TurnoutPosition, Instant)`, `tick(Instant)`,
-`id() const`. Reports via `PositionReporter&` only on change. Needs
-`TurnoutConfig`, `PositionReporter` port.
 
 **#13 — TurnoutRegistry (Build Order 9)**
 Owns 8 `Turnout` objects, implements `TurnoutCommandSink`. `command()`
@@ -109,9 +107,6 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
 
 ## Known scaffolding debt
 
-- `DigitalOutput` port (`lib/McsCore/src/ports/DigitalOutput.h`) still uses
-  `set(bool state)` instead of the design's `write(Level)`. Will be migrated
-  alongside whichever task above first consumes it (likely #12 or #15).
 - `PwmOutput` port (`lib/McsCore/src/ports/PwmOutput.h`) has no consumer
   anywhere in the design and is a removal candidate rather than something to
   keep building on.
