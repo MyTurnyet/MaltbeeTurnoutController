@@ -41,12 +41,16 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `NodeId`/`WifiCredentials`/`BrokerAddress`/`TurnoutConfig`/`NodeConfig`/`ConfigStore` (Node Configuration & Commissioning groundwork) | ✅ Done | Merge commit `d5b2f1a` (branch `feature/node-config`, commits `9d2da6d`..`f42e7b2`, 6 tasks). `NodeConfig` composes the first four; `with...()` updates return modified copies (verified non-mutating); `factoryDefault()` deliberately fails `validate()` (`NodeId(0)`, sentinel `-1` pins) to force commissioning; `validate()` checks node-id range + cross-turnout pin conflicts only, needs-driven. `ConfigStore`/`FakeConfigStore` persist `NodeConfig` (not a single `TurnoutConfig`). Opus review independently re-derived the `Orientation`-equality-via-`toLevel` completeness claim, the pin-conflict counting algorithm, and `factoryDefault()`'s self-consistency — zero Critical/Important findings. |
 | `ArduinoClock`/`EspDigitalOutput`/`EspDigitalInput`/`NvsConfigStore`/`WiFiLink`/`MqttLink`/`MqttCommandSource`/`MqttPositionReporter` (Build Order 11 — ESP32 adapters) | ✅ Done | Merge commit `c021286` (branch `feature/esp32-adapters`, 12 commits). Verified per-adapter via a build-check cycle (`pio run -e esp32dev` with temporary `src/main.cpp` wiring, reverted after) since there's no native equivalent for hardware-bound code; caught two real bugs this way (`MqttLink::connected()` needed to drop `const` — `PubSubClient::connected()` isn't const-qualified; `esp32dev` was silently building as `gnu++11` with no `-std=` override, fixed by adding `-std=gnu++17`). Also closed two scaffolding-debt items as prep: removed the unused `PwmOutput` port/fake, and guarded `TopicScheme::parse`'s `std::stoi` against `std::out_of_range` on an oversized numeric suffix. `src/main.cpp` is still the no-op composition-root stub — real wiring is backlog #16. |
 | `ControllerNode` (Build Order 12) | ✅ Done | Commit `e24a465`. Wires the object graph at startup; `begin()`/`tick()` only, no blocking delays. The static-object exception documented in the architecture. |
+| Bench serial commissioning (Node Configuration & Commissioning) | ✅ Done | Commits `71b967e` (`ParsedCommand`), `da837bd` (`CommandLineParser`), `b53c1ab` (`UartPort`/`FakeUartPort`), `4e76a38` (`CommissioningSession`), `ed88144` (`SerialCommissioningAdapter`), `136a81d` (`EspUartPort`). Implements full command set: `id`/`wifi`/`broker`/`turnout`/`show`/`save`/`reboot`. `SerialCommissioningAdapter`/`EspUartPort` not yet wired into `ControllerNode`/`main.cpp` (mirrors #15→#16 split — no boot-mode-selection logic exists yet to decide when bench-commissioning should run instead of normal operation). |
 
 Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
 Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`)
-and composition root wiring (`ControllerNode`/`main.cpp`).
-25 native test binaries pass as of this snapshot (26 minus the removed
-`PwmOutput` test).
+and composition root wiring (`ControllerNode`/`main.cpp`) and bench serial
+commissioning domain and adapter classes.
+30 native test binaries pass as of this snapshot (adds `test_parsed_command`,
+`test_command_line_parser`, `test_fake_uart_port`, `test_commissioning_session`,
+`test_serial_commissioning_adapter` — `test_esp32_build_check` and `EspUartPort`
+are build-check-only, not native binaries).
 
 ## Backlog (not started)
 
@@ -55,18 +59,10 @@ blocked by is done.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 18 | Bench serial commissioning (Node Configuration & Commissioning) | ⬜ Pending | — (unblocked, #17 done) |
-| 19 | Wireless commissioning (Wireless Commissioning & Field Identification) | ⬜ Pending | #18 |
+| 19 | Wireless commissioning (Wireless Commissioning & Field Identification) | ⬜ Pending | — |
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#18 — Bench serial commissioning (Node Configuration & Commissioning)**
-`CommandLineParser` (domain, pure, text line→`ParsedCommand`),
-`CommissioningSession` (domain, draft `NodeConfig` + `apply(ParsedCommand)` +
-`save()`), `SerialCommissioningAdapter` (adapter, `UartPort`→lines→parser→
-session). Full command set: `id`/`wifi`/`broker`/`turnout`/`show`/`save`/
-`reboot`. `reboot`-not-live-apply per "no dynamic allocation after boot".
 
 **#19 — Wireless commissioning (Wireless Commissioning & Field Identification)**
 `SetupModeTrigger` port + `ButtonSetupModeTrigger` adapter (BOOT held at
@@ -84,21 +80,19 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
 
 ## Known scaffolding debt
 
-- `TopicScheme::parse` (`lib/McsCore/src/domain/TopicScheme.h`) doesn't guard
-  `std::stoi`'s `std::out_of_range` on a long all-digit suffix (e.g. an
-  11-digit topic) — inert today since nothing calls `parse()` yet. Fix
-  before/while building `MqttCommandSource` (Build Order 11), the first real
-  consumer, which will feed it untrusted MQTT topic strings.
-- `NodeConfig::withTurnout(int index, TurnoutConfig)`
-  (`lib/McsCore/src/domain/NodeConfig.h`) has no bounds check on `index` —
-  undefined behavior via `std::array::operator[]` on an out-of-range caller.
-  Deferred as needs-driven (only trusted internal callers today); revisit
-  when `CommissioningSession` (backlog #18) starts calling it with
-  parsed/external input.
 - `ControllerNode`'s debounce/retry durations (`kFeedbackDebounceMs = 20`,
   `kLinkRetryMs = 5000`) are private literals, not `NodeConfig` fields —
   revisit only if a real need for per-node tuning shows up.
 - `ControllerNode` assumes an already-commissioned `NodeConfig`; on a
   factory-default board it constructs adapters against pin `-1`, which is
-  untested — not reachable without bench commissioning (backlog #18)
+  untested — not reachable without bench commissioning (task #18)
   writing real values first.
+- `lib/McsCore/src/adapters/EspUartPort.h` (task #18) has no ongoing
+  build-check coverage — `lib_ldf_mode = deep+` does not force-compile a
+  header that nothing currently `#include`s, so once task #18's temporary
+  `main.cpp` wiring was reverted, the header stopped being compiled by
+  `pio run -e esp32dev` at all. The header was genuinely compiled correctly
+  during task #18's temporary-wiring step and is correct today — this is a
+  coverage gap for *future* edits to this file, not a present defect. Will
+  be resolved once something actually wires `EspUartPort` into
+  `ControllerNode`/`main.cpp` for real (not part of current plan).
