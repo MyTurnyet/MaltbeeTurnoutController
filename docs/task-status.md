@@ -37,22 +37,23 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `TurnoutCommandSink` port + `TurnoutRegistry` domain class (Build Order 9) | ✅ Done | Commit `656dfc8`. First driving-side port (adapters call in); `TurnoutRegistry` owns a fixed `std::array<Turnout, 8>`, buffers commands in `command()`, drains + fans out in `tick()`. Ownership arithmetic (`id/100==nodeId`, index=`id%100-1`) hand-traced against real `Turnout`/`TurnoutMotion`/`FeedbackSensor` by review, zero Critical/Important findings. No `NodeId` value object yet — needs-driven, plain `int nodeId`. |
 | Add TopicScheme/PayloadCodec implementation plan | ✅ Done | Commit `52f3921`. |
 | `TopicScheme` + `PayloadCodec` domain classes (Build Order 10) | ✅ Done | Merge commit `d25f8a8` (branch `feature/topic-scheme-payload-codec`, commits `06b0332`/`0468ca8`). Pure, stateless, static-method classes — topic format `track/turnout/<id>` picked as a provisional resolution of open item 10.4 ("same, or split?"). Review: ready to merge, one non-blocking Important finding (plan-inherited) — `TopicScheme::parse` doesn't guard `std::stoi` overflow on a long numeric suffix; inert today (no consumer yet), revisit when `MqttCommandSource` (Build Order 11) is built. |
+| Add NodeConfig/ConfigStore implementation plan | ✅ Done | Commit `a0b127d`. |
+| `NodeId`/`WifiCredentials`/`BrokerAddress`/`TurnoutConfig`/`NodeConfig`/`ConfigStore` (Node Configuration & Commissioning groundwork) | ✅ Done | Merge commit `d5b2f1a` (branch `feature/node-config`, commits `9d2da6d`..`f42e7b2`, 6 tasks). `NodeConfig` composes the first four; `with...()` updates return modified copies (verified non-mutating); `factoryDefault()` deliberately fails `validate()` (`NodeId(0)`, sentinel `-1` pins) to force commissioning; `validate()` checks node-id range + cross-turnout pin conflicts only, needs-driven. `ConfigStore`/`FakeConfigStore` persist `NodeConfig` (not a single `TurnoutConfig`). Opus review independently re-derived the `Orientation`-equality-via-`toLevel` completeness claim, the pin-conflict counting algorithm, and `factoryDefault()`'s self-consistency — zero Critical/Important findings. |
 
-Build Order steps 1–10 (`docs/software-class-list.md`) are complete. All 20
-native test binaries pass as of this snapshot.
+Build Order steps 1–10 (`docs/software-class-list.md`) are complete, plus the
+Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`).
+All 26 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
 
 Chained in dependency order — a task is only actionable once everything it's
-blocked by is done. `#17` (`NodeConfig`) has no blockers and can be picked up
-any time.
+blocked by is done.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
 | 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | — (unblocked, #14 done) |
 | 16 | ControllerNode + main.cpp composition root (Build Order 12) | ⬜ Pending | #15 |
-| 17 | NodeConfig + ConfigStore migration (Node Configuration & Commissioning) | ⬜ Pending | — |
-| 18 | Bench serial commissioning (Node Configuration & Commissioning) | ⬜ Pending | #17 |
+| 18 | Bench serial commissioning (Node Configuration & Commissioning) | ⬜ Pending | — (unblocked, #17 done) |
 | 19 | Wireless commissioning (Wireless Commissioning & Field Identification) | ⬜ Pending | #18 |
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
@@ -69,12 +70,6 @@ makes sense once the domain classes above exist and run entirely on native.
 Constructs the whole object graph once at startup; `begin()`/`tick()` only,
 no `delay()` anywhere. The one documented static-object exception. Last
 step, depends on everything above.
-
-**#17 — NodeConfig + ConfigStore migration (Node Configuration & Commissioning)**
-`NodeConfig` value object (id, `WifiCredentials`, `BrokerAddress`,
-`array<TurnoutConfig,8>`) with `with...()` updates, `factoryDefault()`,
-`validate() -> vector<ConfigError>`. `NvsConfigStore` persists `NodeConfig`
-instead of a single `TurnoutConfig`. Resolves open item 10.5 groundwork.
 
 **#18 — Bench serial commissioning (Node Configuration & Commissioning)**
 `CommandLineParser` (domain, pure, text line→`ParsedCommand`),
@@ -107,3 +102,9 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
   11-digit topic) — inert today since nothing calls `parse()` yet. Fix
   before/while building `MqttCommandSource` (Build Order 11), the first real
   consumer, which will feed it untrusted MQTT topic strings.
+- `NodeConfig::withTurnout(int index, TurnoutConfig)`
+  (`lib/McsCore/src/domain/NodeConfig.h`) has no bounds check on `index` —
+  undefined behavior via `std::array::operator[]` on an out-of-range caller.
+  Deferred as needs-driven (only trusted internal callers today); revisit
+  when `CommissioningSession` (backlog #18) starts calling it with
+  parsed/external input.
