@@ -5,23 +5,23 @@
 class FakeDigitalOutput : public DigitalOutput
 {
 public:
-    void set(bool state) override
+    void write(Level level) override
     {
-        state_ = state;
-        setCallCount_++;
+        level_ = level;
+        writeCallCount_++;
     }
 
-    bool isSet() const
+    Level level() const
     {
-        return state_;
+        return level_;
     }
 
-    int setCallCount() const
+    int writeCallCount() const
     {
-        return setCallCount_;
+        return writeCallCount_;
     }
 
 private:
-    bool state_ = false;
-    int setCallCount_ = 0;
+    Level level_ = Level::Low;
+    int writeCallCount_ = 0;
 };

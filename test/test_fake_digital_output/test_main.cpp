@@ -3,39 +3,39 @@
 
 #include "support/FakeDigitalOutput.h"
 
-TEST_CASE("FakeDigitalOutput begins low")
+TEST_CASE("FakeDigitalOutput begins Low")
 {
     FakeDigitalOutput output;
 
-    REQUIRE_FALSE(output.isSet());
+    REQUIRE(output.level() == Level::Low);
 }
 
-TEST_CASE("set(true) reports high")
+TEST_CASE("write(High) reports High")
 {
     FakeDigitalOutput output;
 
-    output.set(true);
+    output.write(Level::High);
 
-    REQUIRE(output.isSet());
+    REQUIRE(output.level() == Level::High);
 }
 
-TEST_CASE("set(false) reports low")
+TEST_CASE("write(Low) reports Low")
 {
     FakeDigitalOutput output;
-    output.set(true);
+    output.write(Level::High);
 
-    output.set(false);
+    output.write(Level::Low);
 
-    REQUIRE_FALSE(output.isSet());
+    REQUIRE(output.level() == Level::Low);
 }
 
-TEST_CASE("set() records how many times it was called")
+TEST_CASE("write() records how many times it was called")
 {
     FakeDigitalOutput output;
 
-    output.set(true);
-    output.set(false);
-    output.set(true);
+    output.write(Level::High);
+    output.write(Level::Low);
+    output.write(Level::High);
 
-    REQUIRE(output.setCallCount() == 3);
+    REQUIRE(output.writeCallCount() == 3);
 }

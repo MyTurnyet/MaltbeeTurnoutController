@@ -1,8 +1,10 @@
 #pragma once
 
+#include "domain/Level.h"
+
 class DigitalOutput
 {
 public:
     virtual ~DigitalOutput() = default;
-    virtual void set(bool state) = 0;
+    virtual void write(Level level) = 0;
 };
