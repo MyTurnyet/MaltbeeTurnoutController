@@ -529,6 +529,16 @@ has since implemented Build Order steps 1–3. Current state as of this sync:
 - **`Orientation`** (`lib/McsCore/src/domain/Orientation.h`): **implemented**,
   matches this design's signature (`toLevel(TurnoutPosition) const`,
   `toPosition(Level) const`, round-trip verified). Build Order step 5 done.
+- **`DigitalInput`** (`lib/McsCore/src/ports/DigitalInput.h`): **implemented**,
+  matches this design (`Level read()`). Test double is named
+  `FakeDigitalInput` (`test/support/FakeDigitalInput.h`), not this doc's
+  `ScriptedInput` — same naming divergence already accepted for `Clock`
+  (`ManualClock` → `FakeClock`) and `DigitalOutput` (`RecordingOutput` →
+  `FakeDigitalOutput`).
+- **`FeedbackSensor`** (`lib/McsCore/src/domain/FeedbackSensor.h`):
+  **implemented**, matches this design's signature (`sample(Instant)`,
+  `optional<TurnoutPosition> observed() const`). Build Order step 6 done —
+  first class composing a port with domain logic.
 - **`DigitalOutput`** (`lib/McsCore/src/ports/DigitalOutput.h`): **not yet
   migrated** — still `virtual void set(bool state) = 0`. This design wants
   `void write(Level)`. `Level` now exists (unlike at the last sync), so

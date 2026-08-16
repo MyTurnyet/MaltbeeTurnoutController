@@ -22,8 +22,11 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Add TurnoutPosition/Orientation implementation plan | ✅ Done | Commit `2e939e1`. |
 | `TurnoutPosition` value object | ✅ Done | Commit `b21b450`. Two-valued (`closed()`/`thrown()`), `opposite()`. Reviewed with zero findings. |
 | `Orientation` value object (Build Order 5) | ✅ Done | Commit `e9e9c21`. `Level` ↔ `TurnoutPosition` translation; round-trip property verified by hand and by test. |
+| Add DigitalInput/FeedbackSensor implementation plan | ✅ Done | Commit `9b787bc`. |
+| `DigitalInput` port + `FakeDigitalInput` | ✅ Done | Commit `5ef2e73`. First new port since the original HAL scaffold; queued-sequence fake. |
+| `FeedbackSensor` domain class (Build Order 6) | ✅ Done | Commit `d1aec44`. First class composing a port with domain logic; glitch-rejection test independently hand-traced by review. |
 
-Build Order steps 1–5 (`docs/software-class-list.md`) are complete. All 10
+Build Order steps 1–6 (`docs/software-class-list.md`) are complete. All 12
 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
@@ -34,8 +37,7 @@ have no blockers and can be picked up any time.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 10 | FeedbackSensor domain class (Build Order 6) | ⬜ Pending | — (unblocked, #9 done) |
-| 11 | TurnoutMotion state machine (Build Order 7) | ⬜ Pending | #10 |
+| 11 | TurnoutMotion state machine (Build Order 7) | ⬜ Pending | — (unblocked, #10 done) |
 | 12 | Turnout composition class (Build Order 8) | ⬜ Pending | #11 |
 | 13 | TurnoutRegistry (Build Order 9) | ⬜ Pending | #12 |
 | 14 | TopicScheme + PayloadCodec (Build Order 10) | ⬜ Pending | — |
@@ -47,13 +49,6 @@ have no blockers and can be picked up any time.
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#10 — FeedbackSensor domain class (Build Order 6)**
-Composes `DigitalInput` + `Debouncer` + `Orientation`. `sample(Instant)`,
-`optional<TurnoutPosition> observed() const`. First class to consume the
-`DigitalInput` port and to need `TurnoutPosition`/`Orientation` for real.
-Likely trigger for migrating `DigitalOutput`/adding `DigitalInput` port to
-`Level`-based signatures.
 
 **#11 — TurnoutMotion state machine (Build Order 7)**
 `AtRest`/`Moving`/`Settling`/`Faulted` states per the transition table in
