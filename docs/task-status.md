@@ -41,8 +41,11 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `NodeId`/`WifiCredentials`/`BrokerAddress`/`TurnoutConfig`/`NodeConfig`/`ConfigStore` (Node Configuration & Commissioning groundwork) | ✅ Done | Merge commit `d5b2f1a` (branch `feature/node-config`, commits `9d2da6d`..`f42e7b2`, 6 tasks). `NodeConfig` composes the first four; `with...()` updates return modified copies (verified non-mutating); `factoryDefault()` deliberately fails `validate()` (`NodeId(0)`, sentinel `-1` pins) to force commissioning; `validate()` checks node-id range + cross-turnout pin conflicts only, needs-driven. `ConfigStore`/`FakeConfigStore` persist `NodeConfig` (not a single `TurnoutConfig`). Opus review independently re-derived the `Orientation`-equality-via-`toLevel` completeness claim, the pin-conflict counting algorithm, and `factoryDefault()`'s self-consistency — zero Critical/Important findings. |
 | `ArduinoClock`/`EspDigitalOutput`/`EspDigitalInput`/`NvsConfigStore`/`WiFiLink`/`MqttLink`/`MqttCommandSource`/`MqttPositionReporter` (Build Order 11 — ESP32 adapters) | ✅ Done | Merge commit `c021286` (branch `feature/esp32-adapters`, 12 commits). Verified per-adapter via a build-check cycle (`pio run -e esp32dev` with temporary `src/main.cpp` wiring, reverted after) since there's no native equivalent for hardware-bound code; caught two real bugs this way (`MqttLink::connected()` needed to drop `const` — `PubSubClient::connected()` isn't const-qualified; `esp32dev` was silently building as `gnu++11` with no `-std=` override, fixed by adding `-std=gnu++17`). Also closed two scaffolding-debt items as prep: removed the unused `PwmOutput` port/fake, and guarded `TopicScheme::parse`'s `std::stoi` against `std::out_of_range` on an oversized numeric suffix. `src/main.cpp` is still the no-op composition-root stub — real wiring is backlog #16. |
 
+| `ControllerNode` (Build Order 12) | ✅ Done | Commit `e24a465`. Wires the object graph at startup; `begin()`/`tick()` only, no blocking delays. The static-object exception documented in the architecture. |
+
 Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
-Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`).
+Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`)
+and composition root wiring (`ControllerNode`/`main.cpp`).
 25 native test binaries pass as of this snapshot (26 minus the removed
 `PwmOutput` test).
 
@@ -53,17 +56,11 @@ blocked by is done.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 16 | ControllerNode + main.cpp composition root (Build Order 12) | ⬜ Pending | — (unblocked, #15 done) |
 | 18 | Bench serial commissioning (Node Configuration & Commissioning) | ⬜ Pending | — (unblocked, #17 done) |
 | 19 | Wireless commissioning (Wireless Commissioning & Field Identification) | ⬜ Pending | #18 |
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#16 — ControllerNode + main.cpp composition root (Build Order 12)**
-Constructs the whole object graph once at startup; `begin()`/`tick()` only,
-no `delay()` anywhere. The one documented static-object exception. Last
-step, depends on everything above.
 
 **#18 — Bench serial commissioning (Node Configuration & Commissioning)**
 `CommandLineParser` (domain, pure, text line→`ParsedCommand`),
@@ -99,3 +96,10 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
   Deferred as needs-driven (only trusted internal callers today); revisit
   when `CommissioningSession` (backlog #18) starts calling it with
   parsed/external input.
+- `ControllerNode`'s debounce/retry durations (`kFeedbackDebounceMs = 20`,
+  `kLinkRetryMs = 5000`) are private literals, not `NodeConfig` fields —
+  revisit only if a real need for per-node tuning shows up.
+- `ControllerNode` assumes an already-commissioned `NodeConfig`; on a
+  factory-default board it constructs adapters against pin `-1`, which is
+  untested — not reachable without bench commissioning (backlog #18)
+  writing real values first.
