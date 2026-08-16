@@ -94,9 +94,6 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
 
 ## Known scaffolding debt
 
-- `PwmOutput` port (`lib/McsCore/src/ports/PwmOutput.h`) has no consumer
-  anywhere in the design and is a removal candidate rather than something to
-  keep building on.
 - `TopicScheme::parse` (`lib/McsCore/src/domain/TopicScheme.h`) doesn't guard
   `std::stoi`'s `std::out_of_range` on a long all-digit suffix (e.g. an
   11-digit topic) — inert today since nothing calls `parse()` yet. Fix

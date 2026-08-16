@@ -41,3 +41,8 @@ TEST_CASE("parse(topicFor(id)) round-trips back to id")
     REQUIRE(roundTripped.has_value());
     REQUIRE(*roundTripped == id);
 }
+
+TEST_CASE("parse returns nullopt for a numeric suffix too large for int, instead of throwing")
+{
+    REQUIRE(TopicScheme::parse("track/turnout/99999999999") == std::nullopt);
+}
