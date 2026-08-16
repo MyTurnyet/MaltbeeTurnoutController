@@ -518,6 +518,9 @@ has since implemented Build Order steps 1–3. Current state as of this sync:
   not speculative).
 - **`Debouncer`** (`lib/McsCore/src/domain/Debouncer.h`): **implemented**,
   matches this design's signature (`sample(Level, Instant)`, `stable() const`).
+- **`Deadline`** (`lib/McsCore/src/domain/Deadline.h`): **implemented**,
+  matches this design's signature (`arm(Instant, Duration)`, `disarm()`,
+  `expired(Instant) const`). Build Order step 4 done.
 - **`DigitalOutput`** (`lib/McsCore/src/ports/DigitalOutput.h`): **not yet
   migrated** — still `virtual void set(bool state) = 0`. This design wants
   `void write(Level)`. `Level` now exists (unlike at the last sync), so

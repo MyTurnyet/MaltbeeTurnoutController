@@ -17,8 +17,10 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Sync class-list doc with design doc (first pass) | ✅ Done | Commit `49ab3c9` (pre-session) / `c955eed` housekeeping. |
 | Sync class-list doc: add commissioning + wireless setup design | ✅ Done | Commit `a55e7db`. |
 | `.gitignore`: ignore local git worktree scratch space | ✅ Done | Commit `c955eed`. |
+| Add Deadline implementation plan | ✅ Done | Commit `111d4ef`. |
+| `Deadline` domain class (Build Order 4) | ✅ Done | Commit `14379a8`. One-shot timer, TDD RED/GREEN verified genuinely. |
 
-Build Order steps 1–3 (`docs/software-class-list.md`) are complete. All 8
+Build Order steps 1–4 (`docs/software-class-list.md`) are complete. All 8
 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
@@ -29,8 +31,7 @@ have no blockers and can be picked up any time.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 8 | Deadline domain class (Build Order 4) | ⬜ Pending | — |
-| 9 | Orientation value object (Build Order 5) | ⬜ Pending | #8 |
+| 9 | Orientation value object (Build Order 5) | ⬜ Pending | — (unblocked, #8 done) |
 | 10 | FeedbackSensor domain class (Build Order 6) | ⬜ Pending | #9 |
 | 11 | TurnoutMotion state machine (Build Order 7) | ⬜ Pending | #10 |
 | 12 | Turnout composition class (Build Order 8) | ⬜ Pending | #11 |
@@ -44,11 +45,6 @@ have no blockers and can be picked up any time.
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#8 — Deadline domain class (Build Order 4)**
-One-shot timer: `arm(Instant, Duration)`/`disarm()`, `expired(Instant) const`.
-Used by `TurnoutMotion` for settle delay + movement timeout.
-`lib/McsCore/src/domain/Deadline.h`.
 
 **#9 — Orientation value object (Build Order 5)**
 `Normal|Inverted`, `toLevel(TurnoutPosition)`/`toPosition(Level)` both
