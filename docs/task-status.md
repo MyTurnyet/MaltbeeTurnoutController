@@ -35,20 +35,21 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `Turnout` composition class (Build Order 8) | ✅ Done | Commit `45deaa4`. Composes `DigitalOutput&`/`FeedbackSensor`/`TurnoutMotion`/`PositionReporter&` via DI (no `TurnoutConfig` yet — needs-driven, see plan). Reports only on state change; first `tick()` always reports the starting state. |
 | Add TurnoutCommandSink/TurnoutRegistry implementation plan | ✅ Done | Commit `72f12be`. |
 | `TurnoutCommandSink` port + `TurnoutRegistry` domain class (Build Order 9) | ✅ Done | Commit `656dfc8`. First driving-side port (adapters call in); `TurnoutRegistry` owns a fixed `std::array<Turnout, 8>`, buffers commands in `command()`, drains + fans out in `tick()`. Ownership arithmetic (`id/100==nodeId`, index=`id%100-1`) hand-traced against real `Turnout`/`TurnoutMotion`/`FeedbackSensor` by review, zero Critical/Important findings. No `NodeId` value object yet — needs-driven, plain `int nodeId`. |
+| Add TopicScheme/PayloadCodec implementation plan | ✅ Done | Commit `52f3921`. |
+| `TopicScheme` + `PayloadCodec` domain classes (Build Order 10) | ✅ Done | Merge commit `d25f8a8` (branch `feature/topic-scheme-payload-codec`, commits `06b0332`/`0468ca8`). Pure, stateless, static-method classes — topic format `track/turnout/<id>` picked as a provisional resolution of open item 10.4 ("same, or split?"). Review: ready to merge, one non-blocking Important finding (plan-inherited) — `TopicScheme::parse` doesn't guard `std::stoi` overflow on a long numeric suffix; inert today (no consumer yet), revisit when `MqttCommandSource` (Build Order 11) is built. |
 
-Build Order steps 1–9 (`docs/software-class-list.md`) are complete. All 18
+Build Order steps 1–10 (`docs/software-class-list.md`) are complete. All 20
 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
 
 Chained in dependency order — a task is only actionable once everything it's
-blocked by is done. `#14` (`TopicScheme`/`PayloadCodec`) and `#17` (`NodeConfig`)
-have no blockers and can be picked up any time.
+blocked by is done. `#17` (`NodeConfig`) has no blockers and can be picked up
+any time.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 14 | TopicScheme + PayloadCodec (Build Order 10) | ⬜ Pending | — |
-| 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | #14 |
+| 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | — (unblocked, #14 done) |
 | 16 | ControllerNode + main.cpp composition root (Build Order 12) | ⬜ Pending | #15 |
 | 17 | NodeConfig + ConfigStore migration (Node Configuration & Commissioning) | ⬜ Pending | — |
 | 18 | Bench serial commissioning (Node Configuration & Commissioning) | ⬜ Pending | #17 |
@@ -56,11 +57,6 @@ have no blockers and can be picked up any time.
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#14 — TopicScheme + PayloadCodec (Build Order 10)**
-Pure MQTT topic parse/build and CLOSED/THROWN↔`TurnoutPosition` +
-`TurnoutState`→payload codec. No network, host-testable. Can be done any
-time relative to the other Build Order steps.
 
 **#15 — ESP32 adapters (Build Order 11)**
 `ArduinoClock`, `EspDigitalOutput`, `EspDigitalInput`, `NvsConfigStore`,
@@ -106,3 +102,8 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
 - `PwmOutput` port (`lib/McsCore/src/ports/PwmOutput.h`) has no consumer
   anywhere in the design and is a removal candidate rather than something to
   keep building on.
+- `TopicScheme::parse` (`lib/McsCore/src/domain/TopicScheme.h`) doesn't guard
+  `std::stoi`'s `std::out_of_range` on a long all-digit suffix (e.g. an
+  11-digit topic) — inert today since nothing calls `parse()` yet. Fix
+  before/while building `MqttCommandSource` (Build Order 11), the first real
+  consumer, which will feed it untrusted MQTT topic strings.
