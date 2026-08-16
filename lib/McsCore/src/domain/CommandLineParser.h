@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cctype>
 #include <exception>
 #include <sstream>
 #include <string>
@@ -61,12 +62,45 @@ private:
     static std::vector<std::string> tokenize(const std::string& line)
     {
         std::vector<std::string> tokens;
-        std::istringstream stream(line);
-        std::string token;
-        while (stream >> token)
+        size_t i = 0;
+        size_t n = line.size();
+
+        while (i < n)
         {
-            tokens.push_back(token);
+            while (i < n && std::isspace(static_cast<unsigned char>(line[i])))
+            {
+                ++i;
+            }
+            if (i >= n)
+            {
+                break;
+            }
+
+            if (line[i] == '"')
+            {
+                ++i;
+                size_t start = i;
+                while (i < n && line[i] != '"')
+                {
+                    ++i;
+                }
+                tokens.push_back(line.substr(start, i - start));
+                if (i < n)
+                {
+                    ++i;
+                }
+            }
+            else
+            {
+                size_t start = i;
+                while (i < n && !std::isspace(static_cast<unsigned char>(line[i])))
+                {
+                    ++i;
+                }
+                tokens.push_back(line.substr(start, i - start));
+            }
         }
+
         return tokens;
     }
 

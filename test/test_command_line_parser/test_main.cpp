@@ -111,3 +111,38 @@ TEST_CASE("rejects an unrecognized command")
 {
     REQUIRE(CommandLineParser::parse("banana").type() == CommandType::Invalid);
 }
+
+TEST_CASE("parses wifi command with a quoted ssid containing spaces")
+{
+    ParsedCommand command = CommandLineParser::parse("wifi \"Layout Room\" MyPass");
+
+    REQUIRE(command.type() == CommandType::SetWifi);
+    REQUIRE(command.wifiSsid() == "Layout Room");
+    REQUIRE(command.wifiPassword() == "MyPass");
+}
+
+TEST_CASE("parses wifi command with a quoted password containing spaces")
+{
+    ParsedCommand command = CommandLineParser::parse("wifi MySSID \"blue caboose 42\"");
+
+    REQUIRE(command.type() == CommandType::SetWifi);
+    REQUIRE(command.wifiSsid() == "MySSID");
+    REQUIRE(command.wifiPassword() == "blue caboose 42");
+}
+
+TEST_CASE("parses wifi command with both ssid and password quoted")
+{
+    ParsedCommand command = CommandLineParser::parse("wifi \"Layout Room\" \"blue caboose 42\"");
+
+    REQUIRE(command.type() == CommandType::SetWifi);
+    REQUIRE(command.wifiSsid() == "Layout Room");
+    REQUIRE(command.wifiPassword() == "blue caboose 42");
+}
+
+TEST_CASE("unquoted commands still tokenize exactly as before")
+{
+    ParsedCommand command = CommandLineParser::parse("turnout 1 pin 13 fb 36 orientation normal settle 50 timeout 200");
+
+    REQUIRE(command.type() == CommandType::SetTurnout);
+    REQUIRE(command.turnoutIndex() == 0);
+}
