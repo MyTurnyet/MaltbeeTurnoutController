@@ -25,8 +25,11 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Add DigitalInput/FeedbackSensor implementation plan | ✅ Done | Commit `9b787bc`. |
 | `DigitalInput` port + `FakeDigitalInput` | ✅ Done | Commit `5ef2e73`. First new port since the original HAL scaffold; queued-sequence fake. |
 | `FeedbackSensor` domain class (Build Order 6) | ✅ Done | Commit `d1aec44`. First class composing a port with domain logic; glitch-rejection test independently hand-traced by review. |
+| Add TurnoutState/TurnoutMotion implementation plan | ✅ Done | Commit `642ef7a`. |
+| `TurnoutState` value object | ✅ Done | Commit `26521f7`. Bare `enum class { Closed, Thrown, Moving, Unknown }`. |
+| `TurnoutMotion` state machine (Build Order 7) | ✅ Done | Commit `64cb81b`. All 15 transition-table tests independently hand-traced against the committed code by an Opus review — zero findings. |
 
-Build Order steps 1–6 (`docs/software-class-list.md`) are complete. All 12
+Build Order steps 1–7 (`docs/software-class-list.md`) are complete. All 14
 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
@@ -37,8 +40,7 @@ have no blockers and can be picked up any time.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 11 | TurnoutMotion state machine (Build Order 7) | ⬜ Pending | — (unblocked, #10 done) |
-| 12 | Turnout composition class (Build Order 8) | ⬜ Pending | #11 |
+| 12 | Turnout composition class (Build Order 8) | ⬜ Pending | — (unblocked, #11 done) |
 | 13 | TurnoutRegistry (Build Order 9) | ⬜ Pending | #12 |
 | 14 | TopicScheme + PayloadCodec (Build Order 10) | ⬜ Pending | — |
 | 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | #13, #14 |
@@ -49,13 +51,6 @@ have no blockers and can be picked up any time.
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#11 — TurnoutMotion state machine (Build Order 7)**
-`AtRest`/`Moving`/`Settling`/`Faulted` states per the transition table in
-`docs/software-class-list.md`. `commandTo(TurnoutPosition, Instant)`,
-`update(optional<TurnoutPosition>, Instant)`, `state() const`. ~15
-transition-table tests, no ports/doubles needed. Needs `TurnoutState` value
-object.
 
 **#12 — Turnout composition class (Build Order 8)**
 Composes `TurnoutConfig` + `DigitalOutput` + `FeedbackSensor` +

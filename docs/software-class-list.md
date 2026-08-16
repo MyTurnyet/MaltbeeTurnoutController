@@ -539,6 +539,15 @@ has since implemented Build Order steps 1–3. Current state as of this sync:
   **implemented**, matches this design's signature (`sample(Instant)`,
   `optional<TurnoutPosition> observed() const`). Build Order step 6 done —
   first class composing a port with domain logic.
+- **`TurnoutState`** (`lib/McsCore/src/domain/TurnoutState.h`): **implemented**
+  as a bare `enum class` (like `Level`) — no methods described for it beyond
+  holding one of its four values.
+- **`TurnoutMotion`** (`lib/McsCore/src/domain/TurnoutMotion.h`):
+  **implemented**, matches this design's transition table and signature
+  (`commandTo(TurnoutPosition, Instant)`,
+  `update(optional<TurnoutPosition>, Instant)`, `state() const`). Build
+  Order step 7 done — all 15 transition-table tests independently
+  hand-traced against the committed implementation during review.
 - **`DigitalOutput`** (`lib/McsCore/src/ports/DigitalOutput.h`): **not yet
   migrated** — still `virtual void set(bool state) = 0`. This design wants
   `void write(Level)`. `Level` now exists (unlike at the last sync), so
