@@ -19,8 +19,11 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `.gitignore`: ignore local git worktree scratch space | ✅ Done | Commit `c955eed`. |
 | Add Deadline implementation plan | ✅ Done | Commit `111d4ef`. |
 | `Deadline` domain class (Build Order 4) | ✅ Done | Commit `14379a8`. One-shot timer, TDD RED/GREEN verified genuinely. |
+| Add TurnoutPosition/Orientation implementation plan | ✅ Done | Commit `2e939e1`. |
+| `TurnoutPosition` value object | ✅ Done | Commit `b21b450`. Two-valued (`closed()`/`thrown()`), `opposite()`. Reviewed with zero findings. |
+| `Orientation` value object (Build Order 5) | ✅ Done | Commit `e9e9c21`. `Level` ↔ `TurnoutPosition` translation; round-trip property verified by hand and by test. |
 
-Build Order steps 1–4 (`docs/software-class-list.md`) are complete. All 8
+Build Order steps 1–5 (`docs/software-class-list.md`) are complete. All 10
 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
@@ -31,8 +34,7 @@ have no blockers and can be picked up any time.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 9 | Orientation value object (Build Order 5) | ⬜ Pending | — (unblocked, #8 done) |
-| 10 | FeedbackSensor domain class (Build Order 6) | ⬜ Pending | #9 |
+| 10 | FeedbackSensor domain class (Build Order 6) | ⬜ Pending | — (unblocked, #9 done) |
 | 11 | TurnoutMotion state machine (Build Order 7) | ⬜ Pending | #10 |
 | 12 | Turnout composition class (Build Order 8) | ⬜ Pending | #11 |
 | 13 | TurnoutRegistry (Build Order 9) | ⬜ Pending | #12 |
@@ -45,11 +47,6 @@ have no blockers and can be picked up any time.
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#9 — Orientation value object (Build Order 5)**
-`Normal|Inverted`, `toLevel(TurnoutPosition)`/`toPosition(Level)` both
-directions. Round-trip property test: `toPosition(toLevel(p)) == p`.
-Requires the `TurnoutPosition` value object (not yet built) alongside it.
 
 **#10 — FeedbackSensor domain class (Build Order 6)**
 Composes `DigitalInput` + `Debouncer` + `Orientation`. `sample(Instant)`,
