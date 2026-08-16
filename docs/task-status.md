@@ -33,8 +33,10 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Migrate `DigitalOutput`/`FakeDigitalOutput` onto `Level` | ✅ Done | Commit `212ab68`. Replaces `set(bool)`/`isSet()` with `write(Level)`/`level()`; closes the last "Known scaffolding debt" item besides unused `PwmOutput`. |
 | `PositionReporter` port + `FakePositionReporter` | ✅ Done | Commit `9faa870`. Driven-side port; hand-written fake records `(TurnoutId, TurnoutState)` reports in order. |
 | `Turnout` composition class (Build Order 8) | ✅ Done | Commit `45deaa4`. Composes `DigitalOutput&`/`FeedbackSensor`/`TurnoutMotion`/`PositionReporter&` via DI (no `TurnoutConfig` yet — needs-driven, see plan). Reports only on state change; first `tick()` always reports the starting state. |
+| Add TurnoutCommandSink/TurnoutRegistry implementation plan | ✅ Done | Commit `72f12be`. |
+| `TurnoutCommandSink` port + `TurnoutRegistry` domain class (Build Order 9) | ✅ Done | Commit `656dfc8`. First driving-side port (adapters call in); `TurnoutRegistry` owns a fixed `std::array<Turnout, 8>`, buffers commands in `command()`, drains + fans out in `tick()`. Ownership arithmetic (`id/100==nodeId`, index=`id%100-1`) hand-traced against real `Turnout`/`TurnoutMotion`/`FeedbackSensor` by review, zero Critical/Important findings. No `NodeId` value object yet — needs-driven, plain `int nodeId`. |
 
-Build Order steps 1–8 (`docs/software-class-list.md`) are complete. All 17
+Build Order steps 1–9 (`docs/software-class-list.md`) are complete. All 18
 native test binaries pass as of this snapshot.
 
 ## Backlog (not started)
@@ -45,9 +47,8 @@ have no blockers and can be picked up any time.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 13 | TurnoutRegistry (Build Order 9) | ⬜ Pending | — (unblocked, #12 done) |
 | 14 | TopicScheme + PayloadCodec (Build Order 10) | ⬜ Pending | — |
-| 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | #13, #14 |
+| 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | #14 |
 | 16 | ControllerNode + main.cpp composition root (Build Order 12) | ⬜ Pending | #15 |
 | 17 | NodeConfig + ConfigStore migration (Node Configuration & Commissioning) | ⬜ Pending | — |
 | 18 | Bench serial commissioning (Node Configuration & Commissioning) | ⬜ Pending | #17 |
@@ -55,11 +56,6 @@ have no blockers and can be picked up any time.
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#13 — TurnoutRegistry (Build Order 9)**
-Owns 8 `Turnout` objects, implements `TurnoutCommandSink`. `command()`
-buffers (MQTT callback context safety), `tick()` drains buffer + fans out.
-Ownership arithmetic (`id/100==nodeId`, `id%100==channel`).
 
 **#14 — TopicScheme + PayloadCodec (Build Order 10)**
 Pure MQTT topic parse/build and CLOSED/THROWN↔`TurnoutPosition` +
