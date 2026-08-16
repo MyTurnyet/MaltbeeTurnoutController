@@ -39,10 +39,12 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `TopicScheme` + `PayloadCodec` domain classes (Build Order 10) | ✅ Done | Merge commit `d25f8a8` (branch `feature/topic-scheme-payload-codec`, commits `06b0332`/`0468ca8`). Pure, stateless, static-method classes — topic format `track/turnout/<id>` picked as a provisional resolution of open item 10.4 ("same, or split?"). Review: ready to merge, one non-blocking Important finding (plan-inherited) — `TopicScheme::parse` doesn't guard `std::stoi` overflow on a long numeric suffix; inert today (no consumer yet), revisit when `MqttCommandSource` (Build Order 11) is built. |
 | Add NodeConfig/ConfigStore implementation plan | ✅ Done | Commit `a0b127d`. |
 | `NodeId`/`WifiCredentials`/`BrokerAddress`/`TurnoutConfig`/`NodeConfig`/`ConfigStore` (Node Configuration & Commissioning groundwork) | ✅ Done | Merge commit `d5b2f1a` (branch `feature/node-config`, commits `9d2da6d`..`f42e7b2`, 6 tasks). `NodeConfig` composes the first four; `with...()` updates return modified copies (verified non-mutating); `factoryDefault()` deliberately fails `validate()` (`NodeId(0)`, sentinel `-1` pins) to force commissioning; `validate()` checks node-id range + cross-turnout pin conflicts only, needs-driven. `ConfigStore`/`FakeConfigStore` persist `NodeConfig` (not a single `TurnoutConfig`). Opus review independently re-derived the `Orientation`-equality-via-`toLevel` completeness claim, the pin-conflict counting algorithm, and `factoryDefault()`'s self-consistency — zero Critical/Important findings. |
+| `ArduinoClock`/`EspDigitalOutput`/`EspDigitalInput`/`NvsConfigStore`/`WiFiLink`/`MqttLink`/`MqttCommandSource`/`MqttPositionReporter` (Build Order 11 — ESP32 adapters) | ✅ Done | Merge commit `c021286` (branch `feature/esp32-adapters`, 12 commits). Verified per-adapter via a build-check cycle (`pio run -e esp32dev` with temporary `src/main.cpp` wiring, reverted after) since there's no native equivalent for hardware-bound code; caught two real bugs this way (`MqttLink::connected()` needed to drop `const` — `PubSubClient::connected()` isn't const-qualified; `esp32dev` was silently building as `gnu++11` with no `-std=` override, fixed by adding `-std=gnu++17`). Also closed two scaffolding-debt items as prep: removed the unused `PwmOutput` port/fake, and guarded `TopicScheme::parse`'s `std::stoi` against `std::out_of_range` on an oversized numeric suffix. `src/main.cpp` is still the no-op composition-root stub — real wiring is backlog #16. |
 
-Build Order steps 1–10 (`docs/software-class-list.md`) are complete, plus the
+Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
 Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`).
-All 26 native test binaries pass as of this snapshot.
+25 native test binaries pass as of this snapshot (26 minus the removed
+`PwmOutput` test).
 
 ## Backlog (not started)
 
@@ -51,20 +53,12 @@ blocked by is done.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 15 | ESP32 adapters (Build Order 11) | ⬜ Pending | — (unblocked, #14 done) |
-| 16 | ControllerNode + main.cpp composition root (Build Order 12) | ⬜ Pending | #15 |
+| 16 | ControllerNode + main.cpp composition root (Build Order 12) | ⬜ Pending | — (unblocked, #15 done) |
 | 18 | Bench serial commissioning (Node Configuration & Commissioning) | ⬜ Pending | — (unblocked, #17 done) |
 | 19 | Wireless commissioning (Wireless Commissioning & Field Identification) | ⬜ Pending | #18 |
 | 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
-
-**#15 — ESP32 adapters (Build Order 11)**
-`ArduinoClock`, `EspDigitalOutput`, `EspDigitalInput`, `NvsConfigStore`,
-`WiFiLink`, `MqttLink`, `MqttCommandSource`, `MqttPositionReporter`. Migrate
-`DigitalOutput` port to `write(Level)` as part of this (currently
-`set(bool)`). Decide fate of unused `PwmOutput`/`FakePwmOutput` port. Only
-makes sense once the domain classes above exist and run entirely on native.
 
 **#16 — ControllerNode + main.cpp composition root (Build Order 12)**
 Constructs the whole object graph once at startup; `begin()`/`tick()` only,
