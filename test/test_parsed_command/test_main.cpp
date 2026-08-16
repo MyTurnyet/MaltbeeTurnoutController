@@ -1,5 +1,6 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_test_macros.hpp>
+#include <optional>
 
 #include "domain/ParsedCommand.h"
 #include "domain/TurnoutId.h"
@@ -57,4 +58,11 @@ TEST_CASE("ParsedCommand::invalid carries a reason")
 
     REQUIRE(command.type() == CommandType::Invalid);
     REQUIRE(command.invalidReason() == "bad input");
+}
+
+TEST_CASE("ParsedCommand::turnoutConfig throws when called on a non-SetTurnout command")
+{
+    ParsedCommand command = ParsedCommand::setId(5);
+
+    REQUIRE_THROWS_AS(command.turnoutConfig(), std::bad_optional_access);
 }
