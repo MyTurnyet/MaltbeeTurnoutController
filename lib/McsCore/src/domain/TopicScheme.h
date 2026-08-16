@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <optional>
+#include <stdexcept>
 #include <string>
 
 #include "domain/TurnoutId.h"
@@ -36,7 +37,14 @@ public:
             }
         }
 
-        return TurnoutId(std::stoi(suffix));
+        try
+        {
+            return TurnoutId(std::stoi(suffix));
+        }
+        catch (const std::out_of_range&)
+        {
+            return std::nullopt;
+        }
     }
 
 private:
