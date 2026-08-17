@@ -97,3 +97,15 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
   to decide when setup mode should run instead of normal operation. Will be
   resolved once the boot-sequence logic is implemented and wired into the
   composition root (not part of current plan).
+- `CaptivePortalServer`'s served form (task #19) collects `id`, `wifi_ssid`,
+  `wifi_password`, `broker_host`, `broker_port` only — no turnout pin/feedback
+  fields. On factory-default boards (all 8 turnouts with sentinel pins -1/-1),
+  `NodeConfig::validate()` flags every repeat as a pin-conflict error (~15 total).
+  `WebFormCommissioningAdapter::buildCommandLines()` treats empty turnout fields
+  as "leave unchanged", so a factory-default board cannot complete commissioning
+  through this path once wired up. This is a plan-inherited design gap discovered
+  in the final whole-branch review, not an implementation bug — it requires a
+  product decision to resolve (expand the form to collect turnout fields, give
+  `factoryDefault()` valid non-conflicting per-slot defaults, or change
+  `validate()`'s sentinel-pin handling). Deferred rather than fixed in this
+  branch, since `CaptivePortalServer` is not yet wired into the composition root.
