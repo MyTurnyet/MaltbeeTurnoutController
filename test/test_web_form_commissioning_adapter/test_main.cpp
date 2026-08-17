@@ -64,6 +64,16 @@ TEST_CASE("WebFormCommissioningAdapter applies a fully valid submission and rebo
     REQUIRE(store.saved()->broker().port() == 1883);
     REQUIRE(store.saved()->turnouts()[0].outputPin() == 10);
     REQUIRE(store.saved()->turnouts()[7].outputPin() == 24);
+    REQUIRE(adapter.rebootRequested());
+}
+
+TEST_CASE("WebFormCommissioningAdapter has not requested a reboot before submit is called")
+{
+    FakeConfigStore store;
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+
+    REQUIRE_FALSE(adapter.rebootRequested());
 }
 
 TEST_CASE("WebFormCommissioningAdapter leaves turnout slots with an empty pin unchanged")
@@ -126,6 +136,7 @@ TEST_CASE("WebFormCommissioningAdapter stops at the first error and does not sav
 
     REQUIRE(response.rfind("ERROR", 0) == 0);
     REQUIRE_FALSE(store.saved().has_value());
+    REQUIRE_FALSE(adapter.rebootRequested());
 }
 
 TEST_CASE("WebFormCommissioningAdapter reports a validation error from save and does not reboot")

@@ -35,7 +35,16 @@ public:
         }
 
         CommissioningResult rebootResult = session_.apply(ParsedCommand::reboot());
+        if (rebootResult.rebootRequested)
+        {
+            rebootRequested_ = true;
+        }
         return rebootResult.response;
+    }
+
+    bool rebootRequested() const
+    {
+        return rebootRequested_;
     }
 
 private:
@@ -71,4 +80,5 @@ private:
     }
 
     CommissioningSession& session_;
+    bool rebootRequested_ = false;
 };
