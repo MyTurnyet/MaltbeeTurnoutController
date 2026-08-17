@@ -62,7 +62,7 @@ blocked by is done.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | — |
+| 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
 
 ### Task details
 
