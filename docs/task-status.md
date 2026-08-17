@@ -42,18 +42,25 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `ArduinoClock`/`EspDigitalOutput`/`EspDigitalInput`/`NvsConfigStore`/`WiFiLink`/`MqttLink`/`MqttCommandSource`/`MqttPositionReporter` (Build Order 11 — ESP32 adapters) | ✅ Done | Merge commit `c021286` (branch `feature/esp32-adapters`, 12 commits). Verified per-adapter via a build-check cycle (`pio run -e esp32dev` with temporary `src/main.cpp` wiring, reverted after) since there's no native equivalent for hardware-bound code; caught two real bugs this way (`MqttLink::connected()` needed to drop `const` — `PubSubClient::connected()` isn't const-qualified; `esp32dev` was silently building as `gnu++11` with no `-std=` override, fixed by adding `-std=gnu++17`). Also closed two scaffolding-debt items as prep: removed the unused `PwmOutput` port/fake, and guarded `TopicScheme::parse`'s `std::stoi` against `std::out_of_range` on an oversized numeric suffix. `src/main.cpp` is still the no-op composition-root stub — real wiring is backlog #16. |
 | `ControllerNode` (Build Order 12) | ✅ Done | Commit `e24a465`. Wires the object graph at startup; `begin()`/`tick()` only, no blocking delays. The static-object exception documented in the architecture. |
 | Bench serial commissioning (Node Configuration & Commissioning) | ✅ Done | Commits `71b967e` (`ParsedCommand`), `da837bd` (`CommandLineParser`), `b53c1ab` (`UartPort`/`FakeUartPort`), `4e76a38` (`CommissioningSession`), `ed88144` (`SerialCommissioningAdapter`), `136a81d` (`EspUartPort`). Implements full command set: `id`/`wifi`/`broker`/`turnout`/`show`/`save`/`reboot`. `SerialCommissioningAdapter`/`EspUartPort` not yet wired into `ControllerNode`/`main.cpp` (mirrors #15→#16 split — no boot-mode-selection logic exists yet to decide when bench-commissioning should run instead of normal operation). |
+| Wireless commissioning (Wireless Commissioning & Field Identification) | ✅ Done | Commits `4558481` (`MacAddress`), `180d21f` (`SetupApName`), `febe396` (`SetupModeTrigger`/`DeviceIdentity` ports), `8ec7951` (`ButtonSetupModeTrigger`), `f5706fe` (`WebFormCommissioningAdapter`), `3d4b063` (`EspDeviceIdentity`/`CaptivePortalServer`), `114ed7e` (`rebootRequested()` accessor parity fix). Reuses `CommandLineParser`'s `ParsedCommand` + `CommissioningSession` for web form parsing. `ButtonSetupModeTrigger`/`WebFormCommissioningAdapter`/`EspDeviceIdentity`/`CaptivePortalServer` not yet wired into `ControllerNode`/`main.cpp` (no boot-mode-selection logic exists yet to decide when setup mode should run instead of normal operation). |
 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ✅ Done | Commits `d77dba5` (`BlinkOutIdentifier`), `3f3e5ff` (`IdentifyRequestTrigger` port), `134e418` (`ButtonIdentifyRequestTrigger`, native-tested, deliberate no-`ARDUINO`-guard deviation), `cc94660` (`NodePresenceReporter` port), `f159271` (`NodeIdCollisionGuard`), `6e62547` (`MqttNodePresenceReporter`, `#ifdef ARDUINO`-guarded, build-check-verified only, no native test). `BlinkOutIdentifier` maps `NodeId`+`Clock` to a blink `Level` sequence, testable with `ManualClock`; `NodeIdCollisionGuard` distinguishes collision-vs-self from collision-vs-unrelated node, pure. None of these are wired into `ControllerNode`/`main.cpp` yet (mirrors #15→#16 and #17→#18 splits — no boot-time id-collision-checking or runtime identify-blink-handling logic exists yet). |
 
 Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
 Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`)
 and composition root wiring (`ControllerNode`/`main.cpp`), bench serial
-commissioning domain and adapter classes, and field identification +
-duplicate node ID detection domain classes/ports/adapters.
-35 native test binaries pass as of this snapshot (adds `test_blink_out_identifier`,
-`test_identify_request_trigger_fake`, `test_button_identify_request_trigger`,
-`test_node_presence_reporter_fake`, `test_node_id_collision_guard` —
-`test_esp32_build_check` and `MqttNodePresenceReporter` are build-check-only,
-not native binaries).
+commissioning domain and adapter classes, wireless commissioning domain and
+adapter classes, and field identification + duplicate node ID detection
+domain classes/ports/adapters.
+40 native test binaries pass as of this snapshot (adds `test_parsed_command`,
+`test_command_line_parser`, `test_fake_uart_port`, `test_commissioning_session`,
+`test_serial_commissioning_adapter` from bench serial; `test_mac_address`,
+`test_setup_ap_name`, `test_setup_mode_trigger_fakes`, `test_button_setup_mode_trigger`,
+`test_web_form_commissioning_adapter` from wireless commissioning; and
+`test_blink_out_identifier`, `test_identify_request_trigger_fake`,
+`test_button_identify_request_trigger`, `test_node_presence_reporter_fake`,
+`test_node_id_collision_guard` from field identification — `test_esp32_build_check`,
+`EspUartPort`, `EspDeviceIdentity`, `CaptivePortalServer`, and
+`MqttNodePresenceReporter` are build-check-only, not native binaries).
 
 ## Backlog (not started)
 
@@ -62,16 +69,7 @@ blocked by is done.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 19 | Wireless commissioning (Wireless Commissioning & Field Identification) | ⬜ Pending | — |
-
-### Task details
-
-**#19 — Wireless commissioning (Wireless Commissioning & Field Identification)**
-`SetupModeTrigger` port + `ButtonSetupModeTrigger` adapter (BOOT held at
-power-on), `CaptivePortalServer` adapter, `WebFormCommissioningAdapter`
-(reuses `CommandLineParser`'s `ParsedCommand` + `CommissioningSession`),
-`DeviceIdentity` port + `EspDeviceIdentity` adapter (MAC, setup-AP naming
-only). Depends on the bench commissioning domain classes existing first.
+| — | *(none currently — see "Known scaffolding debt" for deferred wiring/product-decision work)* | | |
 
 ## Known scaffolding debt
 
@@ -91,6 +89,24 @@ only). Depends on the bench commissioning domain classes existing first.
   coverage gap for *future* edits to this file, not a present defect. Will
   be resolved once something actually wires `EspUartPort` into
   `ControllerNode`/`main.cpp` for real (not part of current plan).
+- `ButtonSetupModeTrigger`, `WebFormCommissioningAdapter`, `EspDeviceIdentity`,
+  and `CaptivePortalServer` (task #19) are not yet wired into
+  `ControllerNode`/`src/main.cpp` — no boot-mode-selection logic exists yet
+  to decide when setup mode should run instead of normal operation. Will be
+  resolved once the boot-sequence logic is implemented and wired into the
+  composition root (not part of current plan).
+- `CaptivePortalServer`'s served form (task #19) collects `id`, `wifi_ssid`,
+  `wifi_password`, `broker_host`, `broker_port` only — no turnout pin/feedback
+  fields. On factory-default boards (all 8 turnouts with sentinel pins -1/-1),
+  `NodeConfig::validate()` flags every repeat as a pin-conflict error (~15 total).
+  `WebFormCommissioningAdapter::buildCommandLines()` treats empty turnout fields
+  as "leave unchanged", so a factory-default board cannot complete commissioning
+  through this path once wired up. This is a plan-inherited design gap discovered
+  in the final whole-branch review, not an implementation bug — it requires a
+  product decision to resolve (expand the form to collect turnout fields, give
+  `factoryDefault()` valid non-conflicting per-slot defaults, or change
+  `validate()`'s sentinel-pin handling). Deferred rather than fixed in this
+  branch, since `CaptivePortalServer` is not yet wired into the composition root.
 - `ButtonIdentifyRequestTrigger`, `BlinkOutIdentifier`, `NodeIdCollisionGuard`,
   and `MqttNodePresenceReporter` (task #20) are not yet wired into
   `ControllerNode`/`src/main.cpp` — no boot-time id-collision-checking or

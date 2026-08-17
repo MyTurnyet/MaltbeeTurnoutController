@@ -35,3 +35,15 @@ TEST_CASE("A second save overwrites the first")
 
     REQUIRE(store.load() == second);
 }
+
+TEST_CASE("FakeConfigStore::saved is empty until something is saved")
+{
+    FakeConfigStore store;
+    REQUIRE_FALSE(store.saved().has_value());
+
+    NodeConfig config = NodeConfig::factoryDefault().withId(NodeId(3));
+    store.save(config);
+
+    REQUIRE(store.saved().has_value());
+    REQUIRE(*store.saved() == config);
+}
