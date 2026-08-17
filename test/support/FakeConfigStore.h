@@ -23,6 +23,11 @@ public:
         return NodeConfig::factoryDefault();
     }
 
+    const std::optional<NodeConfig>& saved() const
+    {
+        return saved_;
+    }
+
 private:
     std::optional<NodeConfig> saved_;
 };
