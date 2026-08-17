@@ -42,15 +42,18 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | `ArduinoClock`/`EspDigitalOutput`/`EspDigitalInput`/`NvsConfigStore`/`WiFiLink`/`MqttLink`/`MqttCommandSource`/`MqttPositionReporter` (Build Order 11 — ESP32 adapters) | ✅ Done | Merge commit `c021286` (branch `feature/esp32-adapters`, 12 commits). Verified per-adapter via a build-check cycle (`pio run -e esp32dev` with temporary `src/main.cpp` wiring, reverted after) since there's no native equivalent for hardware-bound code; caught two real bugs this way (`MqttLink::connected()` needed to drop `const` — `PubSubClient::connected()` isn't const-qualified; `esp32dev` was silently building as `gnu++11` with no `-std=` override, fixed by adding `-std=gnu++17`). Also closed two scaffolding-debt items as prep: removed the unused `PwmOutput` port/fake, and guarded `TopicScheme::parse`'s `std::stoi` against `std::out_of_range` on an oversized numeric suffix. `src/main.cpp` is still the no-op composition-root stub — real wiring is backlog #16. |
 | `ControllerNode` (Build Order 12) | ✅ Done | Commit `e24a465`. Wires the object graph at startup; `begin()`/`tick()` only, no blocking delays. The static-object exception documented in the architecture. |
 | Bench serial commissioning (Node Configuration & Commissioning) | ✅ Done | Commits `71b967e` (`ParsedCommand`), `da837bd` (`CommandLineParser`), `b53c1ab` (`UartPort`/`FakeUartPort`), `4e76a38` (`CommissioningSession`), `ed88144` (`SerialCommissioningAdapter`), `136a81d` (`EspUartPort`). Implements full command set: `id`/`wifi`/`broker`/`turnout`/`show`/`save`/`reboot`. `SerialCommissioningAdapter`/`EspUartPort` not yet wired into `ControllerNode`/`main.cpp` (mirrors #15→#16 split — no boot-mode-selection logic exists yet to decide when bench-commissioning should run instead of normal operation). |
+| Wireless commissioning (Wireless Commissioning & Field Identification) | ✅ Done | Commits `4558481` (`MacAddress`), `180d21f` (`SetupApName`), `febe396` (`SetupModeTrigger`/`DeviceIdentity` ports), `8ec7951` (`ButtonSetupModeTrigger`), `f5706fe` (`WebFormCommissioningAdapter`), `3d4b063` (`EspDeviceIdentity`/`CaptivePortalServer`). Reuses `CommandLineParser`'s `ParsedCommand` + `CommissioningSession` for web form parsing. `ButtonSetupModeTrigger`/`WebFormCommissioningAdapter`/`EspDeviceIdentity`/`CaptivePortalServer` not yet wired into `ControllerNode`/`main.cpp` (no boot-mode-selection logic exists yet to decide when setup mode should run instead of normal operation). |
 
 Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
 Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`)
-and composition root wiring (`ControllerNode`/`main.cpp`) and bench serial
-commissioning domain and adapter classes.
-30 native test binaries pass as of this snapshot (adds `test_parsed_command`,
+and composition root wiring (`ControllerNode`/`main.cpp`), bench serial
+commissioning domain and adapter classes, and wireless commissioning domain and adapter classes.
+35 native test binaries pass as of this snapshot (adds `test_parsed_command`,
 `test_command_line_parser`, `test_fake_uart_port`, `test_commissioning_session`,
-`test_serial_commissioning_adapter` — `test_esp32_build_check` and `EspUartPort`
-are build-check-only, not native binaries).
+`test_serial_commissioning_adapter` from bench serial, plus `test_mac_address`,
+`test_setup_ap_name`, `test_setup_mode_trigger_fakes`, `test_button_setup_mode_trigger`,
+`test_web_form_commissioning_adapter` from wireless commissioning — `test_esp32_build_check`,
+`EspUartPort`, `EspDeviceIdentity`, and `CaptivePortalServer` are build-check-only, not native binaries).
 
 ## Backlog (not started)
 
@@ -59,17 +62,9 @@ blocked by is done.
 
 | # | Task | Status | Blocked by |
 |---|---|---|---|
-| 19 | Wireless commissioning (Wireless Commissioning & Field Identification) | ⬜ Pending | — |
-| 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | #19 |
+| 20 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ⬜ Pending | — |
 
 ### Task details
-
-**#19 — Wireless commissioning (Wireless Commissioning & Field Identification)**
-`SetupModeTrigger` port + `ButtonSetupModeTrigger` adapter (BOOT held at
-power-on), `CaptivePortalServer` adapter, `WebFormCommissioningAdapter`
-(reuses `CommandLineParser`'s `ParsedCommand` + `CommissioningSession`),
-`DeviceIdentity` port + `EspDeviceIdentity` adapter (MAC, setup-AP naming
-only). Depends on the bench commissioning domain classes existing first.
 
 **#20 — Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification)**
 `IdentifyRequestTrigger` port + `ButtonIdentifyRequestTrigger` adapter (BOOT
@@ -96,3 +91,9 @@ short-press), `BlinkOutIdentifier` domain class (`NodeId`+`Clock`→blink
   coverage gap for *future* edits to this file, not a present defect. Will
   be resolved once something actually wires `EspUartPort` into
   `ControllerNode`/`main.cpp` for real (not part of current plan).
+- `ButtonSetupModeTrigger`, `WebFormCommissioningAdapter`, `EspDeviceIdentity`,
+  and `CaptivePortalServer` (task #19) are not yet wired into
+  `ControllerNode`/`src/main.cpp` — no boot-mode-selection logic exists yet
+  to decide when setup mode should run instead of normal operation. Will be
+  resolved once the boot-sequence logic is implemented and wired into the
+  composition root (not part of current plan).
