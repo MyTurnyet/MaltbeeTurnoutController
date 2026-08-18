@@ -22,6 +22,11 @@ public:
         return armed_ && now >= deadline_;
     }
 
+    bool armed() const
+    {
+        return armed_;
+    }
+
 private:
     bool armed_ = false;
     Instant deadline_ = Instant(0);

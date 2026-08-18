@@ -11,6 +11,18 @@ TEST_CASE("A Deadline that has never been armed is not expired")
     REQUIRE_FALSE(deadline.expired(Instant(1000)));
 }
 
+TEST_CASE("armed reflects whether the Deadline has been armed and not disarmed")
+{
+    Deadline deadline;
+    REQUIRE_FALSE(deadline.armed());
+
+    deadline.arm(Instant(100), Duration(50));
+    REQUIRE(deadline.armed());
+
+    deadline.disarm();
+    REQUIRE_FALSE(deadline.armed());
+}
+
 TEST_CASE("An armed Deadline is not expired before its duration elapses")
 {
     Deadline deadline;
