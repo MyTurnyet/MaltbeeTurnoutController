@@ -48,6 +48,7 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Config-validity boot gate (Backlog #22) | ✅ Done | Commits `df47bd4` (`BootMode`/`BootModeSelector` domain classes), `7cd9def` (wired into `src/main.cpp`). `ControllerNode` construction is now gated on config validity: if `NodeConfig::validate()` fails, board enters `BootMode::NeedsCommissioning` and runs only the serial commissioning channel, postponing adapter/MQTT construction until config is saved and valid. `BootModeSelector::select` is a pure function of `NodeConfig::validate()`'s result — no hardware/pin state involved. Tested with `test_boot_mode_selector` (native). |
 | Wireless setup mode boot logic | ✅ Done | Commits `739b1df` (extend `BootMode`/`BootModeSelector` with `WirelessSetup` mode), `6fbcb44` (wire `ButtonSetupModeTrigger`/`WebFormCommissioningAdapter`/`EspDeviceIdentity`/`CaptivePortalServer` into `src/main.cpp`). `BootModeSelector::select` now takes a `wirelessSetupRequested` flag; if true, board enters `BootMode::WirelessSetup` and runs wireless commissioning via captive-portal web form; if false, falls back to normal-vs-needs-commissioning logic based on config validity. Holding BOOT through power-on signals wireless setup request. |
 | Captive-portal factory-default turnout-fields fix (Backlog #24) | ✅ Done | Commit `2b51189`. `NodeConfig::validate()` now treats sentinel pin `-1` as "not yet wired" rather than a conflict, so a factory-default board (all 8 turnout slots at `-1`/`-1`) passes validation after only `id`/`wifi`/`broker` are set via the captive portal. Turnout pin wiring is still done afterward via bench serial's `turnout` command — no `CaptivePortalServer`/`WebFormCommissioningAdapter` changes needed. Resolved via product decision: loosen `validate()`'s sentinel handling rather than expand the portal form or fabricate non-conflicting `factoryDefault()` pins. |
+| Field identification + collision guard wiring (Backlog #25) | ✅ Done | Commits `cc7ca03` (`MqttTopicRouter`), `319297e` (`MqttLink::subscribe`), `9d754f4` (migrate `MqttCommandSource`), `a7cbf8e` (`SteadyBlinker`), `d0453a4` (`ControllerNode` presence/collision wiring), `7e4136c` (`Deadline::armed()`), `45a0889` (`src/main.cpp` wiring). Status LED is GPIO 2. `MqttLink` now owns `PubSubClient`'s one callback slot via a new `MqttTopicRouter`, dispatching by exact topic match, so the presence-topic subscription and the 8 turnout-command subscriptions can coexist. A short BOOT press in `BootMode::Normal` blinks the node's id via `BlinkOutIdentifier` for 5 seconds; `ControllerNode::begin()` gives a pre-existing retained presence message a bounded 500ms window to arrive before announcing itself, and if `NodeIdCollisionGuard` reports a collision, skips both the announce and turnout-command subscription, exposing `blocked()` so `main.cpp` drives `SteadyBlinker`'s distinct steady-fast pattern on the same LED instead. |
 
 Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
 Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`)
@@ -55,7 +56,7 @@ and composition root wiring (`ControllerNode`/`main.cpp`), bench serial
 commissioning domain and adapter classes, wireless commissioning domain and
 adapter classes, and field identification + duplicate node ID detection
 domain classes/ports/adapters.
-41 native test binaries pass as of this snapshot (adds `test_boot_mode_selector`
+43 native test binaries pass as of this snapshot (adds `test_boot_mode_selector`
 from config-validity boot gate; `test_parsed_command`,
 `test_command_line_parser`, `test_fake_uart_port`, `test_commissioning_session`,
 `test_serial_commissioning_adapter` from bench serial; `test_mac_address`,
@@ -63,9 +64,11 @@ from config-validity boot gate; `test_parsed_command`,
 `test_web_form_commissioning_adapter` from wireless commissioning; and
 `test_blink_out_identifier`, `test_identify_request_trigger_fake`,
 `test_button_identify_request_trigger`, `test_node_presence_reporter_fake`,
-`test_node_id_collision_guard` from field identification — `test_esp32_build_check`,
-`EspUartPort`, `EspDeviceIdentity`, `CaptivePortalServer`, and
-`MqttNodePresenceReporter` are build-check-only, not native binaries).
+`test_node_id_collision_guard` from field identification; and
+`test_mqtt_topic_router`, `test_steady_blinker` from field identification
+wiring (Backlog #25) — `test_esp32_build_check`, `EspUartPort`,
+`EspDeviceIdentity`, `CaptivePortalServer`, and `MqttNodePresenceReporter`
+are build-check-only, not native binaries).
 
 ## Backlog (not started)
 
@@ -84,11 +87,7 @@ blocked by is done.
 - A board in `BootMode::NeedsCommissioning` (invalid config, BOOT not held)
   currently gives no visual signal — it silently runs only the serial
   commissioning channel with no turnout/MQTT activity. A distinct LED blink
-  pattern is deferred to backlog #25, which needs a status-LED GPIO pin
-  decision first. This was an explicit, approved scope boundary for plan #22,
-  not an oversight.
-- `ButtonIdentifyRequestTrigger`, `BlinkOutIdentifier`, `NodeIdCollisionGuard`,
-  and `MqttNodePresenceReporter` (task #20) are not yet wired into
-  `ControllerNode`/`src/main.cpp` — no boot-time id-collision-checking or
-  runtime identify-blink-handling logic exists yet in the composition root
-  (wiring is deferred to a future task).
+  pattern is not yet implemented — the status LED (GPIO 2, wired for field
+  identification/collision-error blinking) could reuse the same physical LED
+  with a third pattern, but no task currently owns this. This was an
+  explicit, approved scope boundary for plan #22, not an oversight.
