@@ -45,6 +45,13 @@ constexpr unsigned long kIdentifyActiveMs = 5000;
 // blink, visually different from the per-id identify pattern.
 constexpr unsigned long kCollisionBlinkHalfPeriodMs = 250;
 
+// Blink half-period for the setup-mode indicator - rapid steady blink,
+// faster than the collision pattern above so the two are distinguishable
+// even though they never occur at the same time (mutually exclusive boot
+// modes). Lets a customer match the AP name in their WiFi list to the
+// physical board - see docs/software-class-list.md's "Entering Setup Mode".
+constexpr unsigned long kSetupModeBlinkHalfPeriodMs = 100;
+
 // GPIO 0 is the BOOT button on ESP32-WROOM-32 dev boards - active-low, tied
 // high via internal pull-up when not pressed. Reading it here in setup() is
 // well after the ROM bootloader's own strapping-pin decision has resolved.
@@ -83,6 +90,7 @@ static ArduinoClock* blinkClock = nullptr;
 static ButtonIdentifyRequestTrigger* identifyTrigger = nullptr;
 static BlinkOutIdentifier* blinkIdentifier = nullptr;
 static SteadyBlinker* collisionBlinker = nullptr;
+static SteadyBlinker* setupModeBlinker = nullptr;
 static Deadline identifyDeadline;
 static Instant identifyStart(0);
 
@@ -118,6 +126,15 @@ void setup()
         static CaptivePortalServer portal(formAdapter, deviceIdentity.mac());
         captivePortal = &portal;
         captivePortal->begin();
+
+        // Rapid steady blink signals "this board is in setup mode" - see
+        // kSetupModeBlinkHalfPeriodMs above.
+        static EspDigitalOutput led(2);
+        statusLed = &led;
+        static ArduinoClock ledClock;
+        blinkClock = &ledClock;
+        static SteadyBlinker setupBlinker{Duration(kSetupModeBlinkHalfPeriodMs)};
+        setupModeBlinker = &setupBlinker;
     }
     else if (mode == BootMode::Normal)
     {
@@ -175,6 +192,10 @@ void loop()
     if (captivePortal != nullptr)
     {
         captivePortal->poll();
+
+        Instant now = blinkClock->now();
+        statusLed->write(setupModeBlinker->levelAt(now - Instant(0)));
+
         if (webFormAdapter->rebootRequested())
         {
             ESP.restart();
