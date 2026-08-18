@@ -306,10 +306,10 @@ not yet started.
 | 10.3 | Does JMRI accept UNKNOWN as an inbound payload? |
 | 10.4 | Send/receive MQTT topics: same, or split? |
 | 10.5 | Full serial commissioning command set beyond `id` — see [Node Configuration & Commissioning](#node-configuration--commissioning) below |
-| 10.6 | `millis()` 49-day rollover handling in `ArduinoClock` |
+| 10.6 | ~~`millis()` 49-day rollover handling in `ArduinoClock`~~ — **Resolved.** The rollover risk wasn't in `ArduinoClock` itself (`Instant`'s `+`/`-` already wrap correctly via plain unsigned arithmetic) but in `Deadline::expired()`, which compared `Instant`s directly (`now >= deadline_`) instead of via subtraction. Fixed with a signed-difference comparison, safe across a single wraparound for any deadline under ~24.8 days out (every duration this firmware arms is sub-minute). Covered by `test_deadline`'s two wraparound test cases. |
 
-These are answerable via `mosquitto_sub` + the JMRI turnout table, with no
-hardware required, and don't change any class in the list above.
+10.1–10.5 are answerable via `mosquitto_sub` + the JMRI turnout table, with
+no hardware required, and don't change any class in the list above.
 
 ---
 
