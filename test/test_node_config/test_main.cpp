@@ -131,6 +131,16 @@ TEST_CASE("validate rejects two turnouts claiming the same pin")
     REQUIRE(errors[0] == ConfigError{"Pin 100 used by more than one turnout"});
 }
 
+TEST_CASE("validate does not flag sentinel pin -1 as a conflict")
+{
+    NodeConfig defaultConfig = NodeConfig::factoryDefault();
+
+    std::vector<ConfigError> errors = defaultConfig.validate();
+
+    REQUIRE(errors.size() == 1);
+    REQUIRE(errors[0] == ConfigError{"Node id out of range (must be 1-16)"});
+}
+
 TEST_CASE("factoryDefault fails validate, since it still needs commissioning")
 {
     REQUIRE_FALSE(NodeConfig::factoryDefault().validate().empty());
