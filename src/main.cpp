@@ -5,6 +5,9 @@
 #include "adapters/NvsConfigStore.h"
 #include "adapters/SerialCommissioningAdapter.h"
 #include "domain/CommissioningSession.h"
+#include "domain/NodeConfig.h"
+#include "domain/BootMode.h"
+#include "domain/BootModeSelector.h"
 
 // ControllerNode is constructed here (function-local static, not file-scope)
 // because its constructor performs real NVS/GPIO work via NvsConfigStore and
@@ -18,28 +21,39 @@ static SerialCommissioningAdapter* commissioningAdapter = nullptr;
 
 void setup()
 {
-    static ControllerNode instance;
-    node = &instance;
-    node->begin();
-
-    // Bench serial commissioning runs in parallel with normal operation, not
-    // as an alternate boot mode - it's a distinct physical channel (UART)
-    // from the turnout GPIO/MQTT graph ControllerNode owns, so a technician
-    // can plug in and commission at any time, per docs/software-class-list.md's
-    // "Plug into USB, open a serial terminal" workflow. Uses its own
-    // NvsConfigStore instance (stateless per call, same "mcs-cfg" namespace
-    // ControllerNode's own store reads) rather than reaching into
-    // ControllerNode's internals.
+    // Bench serial commissioning runs in parallel with normal operation
+    // regardless of config validity, so a technician can always recover a
+    // board stuck in NeedsCommissioning mode by plugging in USB - it's a
+    // distinct physical channel (UART) from the turnout GPIO/MQTT graph.
     static NvsConfigStore commissioningStore;
     static CommissioningSession commissioningSession(commissioningStore);
     static EspUartPort uart(115200);
     static SerialCommissioningAdapter adapter(uart, commissioningSession);
     commissioningAdapter = &adapter;
+
+    // Constructing ControllerNode wires real GPIO pins from NodeConfig - on a
+    // factory-default or otherwise invalid config (e.g. NodeId(0), sentinel
+    // pin -1 on every turnout), that would build EspDigitalOutput/
+    // EspDigitalInput against pin -1, which is untested and unsafe. Check
+    // validity first and skip building the hardware graph entirely if it
+    // would be unsafe - node stays nullptr, loop() only runs the always-on
+    // serial commissioning channel until a technician saves a valid config
+    // and reboots.
+    NodeConfig config = commissioningStore.load();
+    if (BootModeSelector::select(config) == BootMode::Normal)
+    {
+        static ControllerNode instance;
+        node = &instance;
+        node->begin();
+    }
 }
 
 void loop()
 {
-    node->tick();
+    if (node != nullptr)
+    {
+        node->tick();
+    }
 
     commissioningAdapter->poll();
     if (commissioningAdapter->rebootRequested())
