@@ -45,6 +45,7 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Wire bench serial commissioning into `src/main.cpp` | ✅ Done | Commit `5df0be8`. `SerialCommissioningAdapter`/`EspUartPort`/`CommissioningSession`/`NvsConfigStore` are constructed in `setup()` and `commissioningAdapter->poll()` is called every `loop()` iteration, in parallel with `ControllerNode::tick()` — not an alternate boot mode, since bench serial is a distinct UART channel from the turnout GPIO/MQTT graph `ControllerNode` owns. Build-check verified only (`pio run -e esp32dev`) — `main.cpp` has no native equivalent. |
 | Wireless commissioning (Wireless Commissioning & Field Identification) | ✅ Done | Commits `4558481` (`MacAddress`), `180d21f` (`SetupApName`), `febe396` (`SetupModeTrigger`/`DeviceIdentity` ports), `8ec7951` (`ButtonSetupModeTrigger`), `f5706fe` (`WebFormCommissioningAdapter`), `3d4b063` (`EspDeviceIdentity`/`CaptivePortalServer`), `114ed7e` (`rebootRequested()` accessor parity fix). Reuses `CommandLineParser`'s `ParsedCommand` + `CommissioningSession` for web form parsing. `ButtonSetupModeTrigger`/`WebFormCommissioningAdapter`/`EspDeviceIdentity`/`CaptivePortalServer` not yet wired into `ControllerNode`/`main.cpp` (no boot-mode-selection logic exists yet to decide when setup mode should run instead of normal operation). |
 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ✅ Done | Commits `d77dba5` (`BlinkOutIdentifier`), `3f3e5ff` (`IdentifyRequestTrigger` port), `134e418` (`ButtonIdentifyRequestTrigger`, native-tested, deliberate no-`ARDUINO`-guard deviation), `cc94660` (`NodePresenceReporter` port), `f159271` (`NodeIdCollisionGuard`), `6e62547` (`MqttNodePresenceReporter`, `#ifdef ARDUINO`-guarded, build-check-verified only, no native test). `BlinkOutIdentifier` maps `NodeId`+`Clock` to a blink `Level` sequence, testable with `ManualClock`; `NodeIdCollisionGuard` distinguishes collision-vs-self from collision-vs-unrelated node, pure. None of these are wired into `ControllerNode`/`main.cpp` yet (mirrors #15→#16 and #17→#18 splits — no boot-time id-collision-checking or runtime identify-blink-handling logic exists yet). |
+| Config-validity boot gate (Backlog #22) | ✅ Done | Commits `df47bd4` (`BootMode`/`BootModeSelector` domain classes), `7cd9def` (wired into `src/main.cpp`). `ControllerNode` construction is now gated on config validity: if `NodeConfig::validate()` fails, board enters `BootMode::NeedsCommissioning` and runs only the serial commissioning channel, postponing adapter/MQTT construction until config is saved and valid. `BootModeSelector::select` is a pure function of `NodeConfig::validate()`'s result — no hardware/pin state involved. Tested with `test_boot_mode_selector` (native). |
 
 Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
 Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`)
@@ -52,7 +53,8 @@ and composition root wiring (`ControllerNode`/`main.cpp`), bench serial
 commissioning domain and adapter classes, wireless commissioning domain and
 adapter classes, and field identification + duplicate node ID detection
 domain classes/ports/adapters.
-40 native test binaries pass as of this snapshot (adds `test_parsed_command`,
+41 native test binaries pass as of this snapshot (adds `test_boot_mode_selector`
+from config-validity boot gate; `test_parsed_command`,
 `test_command_line_parser`, `test_fake_uart_port`, `test_commissioning_session`,
 `test_serial_commissioning_adapter` from bench serial; `test_mac_address`,
 `test_setup_ap_name`, `test_setup_mode_trigger_fakes`, `test_button_setup_mode_trigger`,
@@ -77,16 +79,18 @@ blocked by is done.
 - `ControllerNode`'s debounce/retry durations (`kFeedbackDebounceMs = 20`,
   `kLinkRetryMs = 5000`) are private literals, not `NodeConfig` fields —
   revisit only if a real need for per-node tuning shows up.
-- `ControllerNode` assumes an already-commissioned `NodeConfig`; on a
-  factory-default board it constructs adapters against pin `-1`, which is
-  untested — not reachable without bench commissioning (task #18)
-  writing real values first.
 - `ButtonSetupModeTrigger`, `WebFormCommissioningAdapter`, `EspDeviceIdentity`,
   and `CaptivePortalServer` (task #19) are not yet wired into
   `ControllerNode`/`src/main.cpp` — no boot-mode-selection logic exists yet
   to decide when setup mode should run instead of normal operation. Will be
   resolved once the boot-sequence logic is implemented and wired into the
   composition root (not part of current plan).
+- A board in `BootMode::NeedsCommissioning` (invalid config, BOOT not held)
+  currently gives no visual signal — it silently runs only the serial
+  commissioning channel with no turnout/MQTT activity. A distinct LED blink
+  pattern is deferred to backlog #25, which needs a status-LED GPIO pin
+  decision first. This was an explicit, approved scope boundary for plan #22,
+  not an oversight.
 - `CaptivePortalServer`'s served form (task #19) collects `id`, `wifi_ssid`,
   `wifi_password`, `broker_host`, `broker_port` only — no turnout pin/feedback
   fields. On factory-default boards (all 8 turnouts with sentinel pins -1/-1),
