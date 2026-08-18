@@ -473,8 +473,8 @@ standing under the layout confirm "this is node 4" without a phone, once a
 node has actually been assigned an id.
 
 Reuses the same `SetupModeTrigger` GPIO read, distinguished by hold
-duration — short press vs. the longer hold-then-release that (re-)enters — so no new physical input is
-needed.
+duration — short press vs. the longer hold-then-release that (re-)enters
+setup mode — so no new physical input is needed.
 
 | Class | Layer | Responsibility |
 |---|---|---|
