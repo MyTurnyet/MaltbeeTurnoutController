@@ -103,5 +103,4 @@ blocked by is done.
   and `MqttNodePresenceReporter` (task #20) are not yet wired into
   `ControllerNode`/`src/main.cpp` — no boot-time id-collision-checking or
   runtime identify-blink-handling logic exists yet in the composition root
-  (mirrors the bench-serial-commissioning gap above; wiring is deferred to a
-  future task).
+  (wiring is deferred to a future task).
