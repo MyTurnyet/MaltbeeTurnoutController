@@ -113,6 +113,11 @@ public:
         {
             for (int pin : {turnout.outputPin(), turnout.feedbackPin()})
             {
+                if (pin == -1)
+                {
+                    continue;
+                }
+
                 bool alreadySeen = std::find(seenPins.begin(), seenPins.end(), pin) != seenPins.end();
                 if (alreadySeen)
                 {
