@@ -12,6 +12,7 @@
 #include "domain/Instant.h"
 #include "domain/Duration.h"
 #include "domain/BrokerAddress.h"
+#include "domain/MqttTopicRouter.h"
 
 class MqttLink
 {
@@ -25,6 +26,10 @@ public:
           client_(wifiClient_),
           lastAttempt_(Instant(0))
     {
+        client_.setCallback([this](char* topic, byte* payload, unsigned int length) {
+            std::string text(reinterpret_cast<char*>(payload), length);
+            router_.dispatch(topic, text);
+        });
     }
 
     void begin(const BrokerAddress& broker)
@@ -53,6 +58,15 @@ public:
         return client_.connected();
     }
 
+    // The one place PubSubClient::setCallback is ever called is this
+    // class's constructor above - every subscriber routes through here so
+    // no caller can silently clobber another's callback registration.
+    void subscribe(const std::string& topic, MqttTopicRouter::Handler handler)
+    {
+        router_.on(topic, std::move(handler));
+        client_.subscribe(topic.c_str());
+    }
+
     PubSubClient& raw()
     {
         return client_;
@@ -73,6 +87,7 @@ private:
     WiFiClient wifiClient_;
     PubSubClient client_;
     Instant lastAttempt_;
+    MqttTopicRouter router_;
 };
 
 #endif
