@@ -2,9 +2,6 @@
 
 #ifdef ARDUINO
 
-#include <Arduino.h>
-#include <PubSubClient.h>
-
 #include <optional>
 #include <string>
 
@@ -22,37 +19,30 @@ public:
     MqttCommandSource(MqttLink& link, TurnoutCommandSink& sink)
         : link_(link), sink_(sink)
     {
-        link_.raw().setCallback([this](char* topic, byte* payload, unsigned int length) {
-            handle(topic, payload, length);
-        });
     }
 
     void subscribeAll(int nodeId)
     {
         for (int channel = 1; channel <= TurnoutRegistry::TurnoutsPerNode; ++channel)
         {
-            std::string topic = TopicScheme::topicFor(TurnoutId(nodeId * 100 + channel));
-            link_.raw().subscribe(topic.c_str());
+            TurnoutId id(nodeId * 100 + channel);
+            std::string topic = TopicScheme::topicFor(id);
+            link_.subscribe(topic, [this, id](const std::string& payload) {
+                handle(id, payload);
+            });
         }
     }
 
 private:
-    void handle(char* topic, byte* payload, unsigned int length)
+    void handle(TurnoutId id, const std::string& payload)
     {
-        std::optional<TurnoutId> id = TopicScheme::parse(topic);
-        if (!id.has_value())
-        {
-            return;
-        }
-
-        std::string text(reinterpret_cast<char*>(payload), length);
-        std::optional<TurnoutPosition> position = PayloadCodec::decode(text);
+        std::optional<TurnoutPosition> position = PayloadCodec::decode(payload);
         if (!position.has_value())
         {
             return;
         }
 
-        sink_.command(*id, *position);
+        sink_.command(id, *position);
     }
 
     MqttLink& link_;
