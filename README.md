@@ -21,6 +21,12 @@ pio device monitor
 
 On Windows, if `pio test -e native` builds but the test binary fails to run, make sure your MinGW `bin` directory is ahead of any other GCC/MinGW installs on `PATH` — see `CLAUDE.md` for details.
 
+## First-Time Setup
+
+Setting up a board for the first time? See
+[docs/first-time-setup.md](docs/first-time-setup.md) — a wireless,
+no-computer-required walkthrough for customers.
+
 ## Status
 
 Foundation hardware-abstraction-layer ports are in place, built needs-driven and TDD'd against the native test environment: `Clock`, `DigitalOutput`, `PwmOutput` (`lib/McsCore/src/ports/`), each with a hand-written fake (`test/support/`). The first domain value objects (`Duration`, `Instant`, `Level`) and the first real domain class (`Debouncer`) are also in place under `lib/McsCore/src/domain/`, TDD'd with no test doubles needed. No ESP32 hardware adapters, MQTT/JMRI communication, or turnout-level domain classes (`TurnoutMotion`, `Turnout`) yet — those come next as real needs arise. See `docs/software-class-list.md` for the concrete turnout-controller class breakdown and `docs/superpowers/` for design and implementation history.
