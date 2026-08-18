@@ -3,6 +3,7 @@
 #include "adapters/ControllerNode.h"
 #include "adapters/EspUartPort.h"
 #include "adapters/NvsConfigStore.h"
+#include "adapters/NvsSetupModeRequestStore.h"
 #include "adapters/SerialCommissioningAdapter.h"
 #include "adapters/ButtonSetupModeTrigger.h"
 #include "adapters/ButtonIdentifyRequestTrigger.h"
@@ -25,17 +26,19 @@
 
 namespace
 {
-// How long BOOT must be held through power-on to enter wireless setup mode.
-// This is an unavoidable fixed delay on every boot, not just when BOOT is
-// held - see this plan's Global Constraints for why.
-constexpr unsigned long kBootWindowMs = 2000;
-
 // Short-press window for the runtime identify-blink trigger (field
-// identification), distinguished from the setup-mode hold above by a
-// shorter max duration - reuses the same physical BOOT pin, per
+// identification) - reuses the same physical BOOT pin, per
 // docs/software-class-list.md's "Field Identification: Blink-Out" design.
 constexpr unsigned long kIdentifyMinPressMs = 50;
 constexpr unsigned long kIdentifyMaxPressMs = 1500;
+
+// How long BOOT must be held, during normal runtime, before releasing it
+// re-enters wireless setup on the next boot. Deliberately well above
+// kIdentifyMaxPressMs above so a single release can never satisfy both
+// triggers. Read live in loop() rather than at boot time - see
+// ButtonSetupModeTrigger.h for why holding BOOT through an ESP32 power-on
+// can't be detected in application code at all.
+constexpr unsigned long kSetupModeHoldMs = 3000;
 
 // How long the identify-blink sequence stays active after a qualifying
 // short press, before the status LED goes dark again.
@@ -51,24 +54,6 @@ constexpr unsigned long kCollisionBlinkHalfPeriodMs = 250;
 // modes). Lets a customer match the AP name in their WiFi list to the
 // physical board - see docs/software-class-list.md's "Entering Setup Mode".
 constexpr unsigned long kSetupModeBlinkHalfPeriodMs = 100;
-
-// GPIO 0 is the BOOT button on ESP32-WROOM-32 dev boards - active-low, tied
-// high via internal pull-up when not pressed. Reading it here in setup() is
-// well after the ROM bootloader's own strapping-pin decision has resolved.
-bool detectWirelessSetupRequest(EspDigitalInput& bootPin)
-{
-    static ArduinoClock bootClock;
-    static ButtonSetupModeTrigger trigger(bootPin, Duration(kBootWindowMs));
-
-    Instant start = bootClock.now();
-    trigger.poll(start);
-    while ((bootClock.now() - start) < Duration(kBootWindowMs))
-    {
-        trigger.poll(bootClock.now());
-    }
-
-    return trigger.requested();
-}
 }
 
 // ControllerNode is constructed here (function-local static, not file-scope)
@@ -91,6 +76,8 @@ static ButtonIdentifyRequestTrigger* identifyTrigger = nullptr;
 static BlinkOutIdentifier* blinkIdentifier = nullptr;
 static SteadyBlinker* collisionBlinker = nullptr;
 static SteadyBlinker* setupModeBlinker = nullptr;
+static ButtonSetupModeTrigger* runtimeSetupTrigger = nullptr;
+static NvsSetupModeRequestStore* setupRequestStore = nullptr;
 static Deadline identifyDeadline;
 static Instant identifyStart(0);
 
@@ -106,13 +93,23 @@ void setup()
     static SerialCommissioningAdapter adapter(uart, commissioningSession);
     commissioningAdapter = &adapter;
 
-    // Shared with the runtime identify-blink trigger below (Normal mode
-    // only) - same physical BOOT pin, distinguished by press duration, per
-    // docs/software-class-list.md.
-    static EspDigitalInput bootPin(0, true);
-    bool wirelessSetupRequested = detectWirelessSetupRequest(bootPin);
+    static NvsSetupModeRequestStore requestStore;
+    setupRequestStore = &requestStore;
+    bool wirelessSetupRequested = requestStore.consumeRequest();
+
     NodeConfig config = commissioningStore.load();
     BootMode mode = BootModeSelector::select(config, wirelessSetupRequested);
+
+    // Shared with the runtime identify/setup-mode triggers below - same
+    // physical BOOT pin, distinguished by hold duration.
+    static EspDigitalInput bootPin(0, true);
+
+    // Status LED (GPIO 2) and its clock are shared across all three boot
+    // modes - only the pattern driving them differs.
+    static EspDigitalOutput led(2);
+    statusLed = &led;
+    static ArduinoClock ledClock;
+    blinkClock = &ledClock;
 
     if (mode == BootMode::WirelessSetup)
     {
@@ -129,47 +126,60 @@ void setup()
 
         // Rapid steady blink signals "this board is in setup mode" - see
         // kSetupModeBlinkHalfPeriodMs above.
-        static EspDigitalOutput led(2);
-        statusLed = &led;
-        static ArduinoClock ledClock;
-        blinkClock = &ledClock;
         static SteadyBlinker setupBlinker{Duration(kSetupModeBlinkHalfPeriodMs)};
         setupModeBlinker = &setupBlinker;
     }
-    else if (mode == BootMode::Normal)
+    else
     {
-        static ControllerNode instance;
-        node = &instance;
-        node->begin();
+        // Normal and NeedsCommissioning both watch BOOT for the runtime
+        // gesture that (re-)enters wireless setup: hold for
+        // kSetupModeHoldMs, then release. This is the only way a
+        // factory-fresh board (NeedsCommissioning, no valid config yet)
+        // reaches wireless setup at all.
+        static ButtonSetupModeTrigger setupTrigger(bootPin, Duration(kSetupModeHoldMs));
+        runtimeSetupTrigger = &setupTrigger;
 
-        // Field identification (short-press BOOT blinks the node's id) and
-        // the distinct collision-error pattern (steady fast blink, driven
-        // instead whenever ControllerNode::blocked() is true) share one
-        // physical status LED - only meaningful once a node has an actual
-        // id, so these are only constructed in Normal mode.
-        static EspDigitalOutput led(2);
-        statusLed = &led;
-        static ArduinoClock ledClock;
-        blinkClock = &ledClock;
-        static ButtonIdentifyRequestTrigger trigger(bootPin, Duration(kIdentifyMinPressMs), Duration(kIdentifyMaxPressMs));
-        identifyTrigger = &trigger;
-        static BlinkOutIdentifier identifier(config.id(), Duration(200), Duration(200), Duration(1000));
-        blinkIdentifier = &identifier;
-        static SteadyBlinker errorBlinker{Duration(kCollisionBlinkHalfPeriodMs)};
-        collisionBlinker = &errorBlinker;
+        if (mode == BootMode::Normal)
+        {
+            static ControllerNode instance;
+            node = &instance;
+            node->begin();
+
+            // Field identification (short-press BOOT blinks the node's id)
+            // and the distinct collision-error pattern (steady fast blink,
+            // driven instead whenever ControllerNode::blocked() is true)
+            // share the status LED - only meaningful once a node has an
+            // actual id, so these are only constructed in Normal mode.
+            static ButtonIdentifyRequestTrigger trigger(bootPin, Duration(kIdentifyMinPressMs), Duration(kIdentifyMaxPressMs));
+            identifyTrigger = &trigger;
+            static BlinkOutIdentifier identifier(config.id(), Duration(200), Duration(200), Duration(1000));
+            blinkIdentifier = &identifier;
+            static SteadyBlinker errorBlinker{Duration(kCollisionBlinkHalfPeriodMs)};
+            collisionBlinker = &errorBlinker;
+        }
     }
-
-    // BootMode::NeedsCommissioning: neither node nor captivePortal is
-    // constructed - loop() below only runs the always-on serial channel.
 }
 
 void loop()
 {
+    Instant now = blinkClock->now();
+
+    if (runtimeSetupTrigger != nullptr)
+    {
+        runtimeSetupTrigger->poll(now);
+        if (runtimeSetupTrigger->requested())
+        {
+            // BOOT was already observed released (see ButtonSetupModeTrigger)
+            // before this fires, so it's safe to restart here - GPIO0 won't
+            // be held low at the ROM's next strapping-pin sample.
+            setupRequestStore->requestOnNextBoot();
+            ESP.restart();
+        }
+    }
+
     if (node != nullptr)
     {
         node->tick();
-
-        Instant now = blinkClock->now();
 
         if (node->blocked())
         {
@@ -192,8 +202,6 @@ void loop()
     if (captivePortal != nullptr)
     {
         captivePortal->poll();
-
-        Instant now = blinkClock->now();
         statusLed->write(setupModeBlinker->levelAt(now - Instant(0)));
 
         if (webFormAdapter->rebootRequested())
