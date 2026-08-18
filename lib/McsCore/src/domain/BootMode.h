@@ -3,5 +3,6 @@
 enum class BootMode
 {
     Normal,
-    NeedsCommissioning
+    NeedsCommissioning,
+    WirelessSetup
 };

@@ -1,4 +1,3 @@
-// test/test_boot_mode_selector/test_main.cpp
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_test_macros.hpp>
 
@@ -33,20 +32,20 @@ NodeConfig fullyValidConfig()
 }
 }
 
-TEST_CASE("BootModeSelector selects Normal for a fully valid config")
+TEST_CASE("BootModeSelector selects Normal for a fully valid config, no wireless setup request")
 {
-    REQUIRE(BootModeSelector::select(fullyValidConfig()) == BootMode::Normal);
+    REQUIRE(BootModeSelector::select(fullyValidConfig(), false) == BootMode::Normal);
 }
 
-TEST_CASE("BootModeSelector selects NeedsCommissioning for the factory default")
+TEST_CASE("BootModeSelector selects NeedsCommissioning for the factory default, no wireless setup request")
 {
-    REQUIRE(BootModeSelector::select(NodeConfig::factoryDefault()) == BootMode::NeedsCommissioning);
+    REQUIRE(BootModeSelector::select(NodeConfig::factoryDefault(), false) == BootMode::NeedsCommissioning);
 }
 
 TEST_CASE("BootModeSelector selects NeedsCommissioning for an out-of-range node id alone")
 {
     NodeConfig config = fullyValidConfig().withId(NodeId(0));
-    REQUIRE(BootModeSelector::select(config) == BootMode::NeedsCommissioning);
+    REQUIRE(BootModeSelector::select(config, false) == BootMode::NeedsCommissioning);
 }
 
 TEST_CASE("BootModeSelector selects NeedsCommissioning for a pin conflict alone")
@@ -55,5 +54,15 @@ TEST_CASE("BootModeSelector selects NeedsCommissioning for a pin conflict alone"
     Duration settle(50);
     Duration timeout(200);
     NodeConfig config = fullyValidConfig().withTurnout(1, TurnoutConfig(TurnoutId(2), 10, 11, orientation, settle, timeout));
-    REQUIRE(BootModeSelector::select(config) == BootMode::NeedsCommissioning);
+    REQUIRE(BootModeSelector::select(config, false) == BootMode::NeedsCommissioning);
+}
+
+TEST_CASE("BootModeSelector selects WirelessSetup when requested, even with a fully valid config")
+{
+    REQUIRE(BootModeSelector::select(fullyValidConfig(), true) == BootMode::WirelessSetup);
+}
+
+TEST_CASE("BootModeSelector selects WirelessSetup when requested, even with an invalid config")
+{
+    REQUIRE(BootModeSelector::select(NodeConfig::factoryDefault(), true) == BootMode::WirelessSetup);
 }
