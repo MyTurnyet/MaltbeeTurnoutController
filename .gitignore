@@ -63,6 +63,9 @@ desktop.ini
 # Local git worktrees (EnterWorktree / git worktree add scratch space)
 .claude/worktrees/
 
+# Subagent-driven-development progress ledger (local scratch, not shared history)
+.superpowers/
+
 # Local environment files
 .env
 .env.*
