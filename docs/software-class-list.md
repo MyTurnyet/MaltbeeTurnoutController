@@ -450,7 +450,7 @@ board without needing to already know its id.
 
 | Class | Layer | Responsibility |
 |---|---|---|
-| `SetupModeTrigger` | Port | `bool requested()` — was BOOT held through the boot window? |
+| `SetupModeTrigger` | Port | `bool requested()` — was BOOT just released after being held for at least the configured duration? |
 | `ButtonSetupModeTrigger` | Adapter | Polls the BOOT pin during normal runtime (`loop()`), firing when a hold of at least the configured duration is released |
 | `SetupModeRequestStore` | Port | `void requestOnNextBoot()` / `bool consumeRequest()` — persists "enter wireless setup" across the reboot the runtime hold-and-release triggers |
 | `NvsSetupModeRequestStore` | Adapter | Persists the pending-setup flag in NVS (`Preferences`), in a namespace separate from `NodeConfig` |
@@ -473,7 +473,7 @@ standing under the layout confirm "this is node 4" without a phone, once a
 node has actually been assigned an id.
 
 Reuses the same `SetupModeTrigger` GPIO read, distinguished by hold
-duration — short press vs. held-through-boot — so no new physical input is
+duration — short press vs. the longer hold-then-release that (re-)enters — so no new physical input is
 needed.
 
 | Class | Layer | Responsibility |
