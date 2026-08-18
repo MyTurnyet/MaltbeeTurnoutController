@@ -47,6 +47,7 @@ the backlog changes — it's a point-in-time reference, not a live tracker.
 | Field identification + duplicate node ID detection (Wireless Commissioning & Field Identification) | ✅ Done | Commits `d77dba5` (`BlinkOutIdentifier`), `3f3e5ff` (`IdentifyRequestTrigger` port), `134e418` (`ButtonIdentifyRequestTrigger`, native-tested, deliberate no-`ARDUINO`-guard deviation), `cc94660` (`NodePresenceReporter` port), `f159271` (`NodeIdCollisionGuard`), `6e62547` (`MqttNodePresenceReporter`, `#ifdef ARDUINO`-guarded, build-check-verified only, no native test). `BlinkOutIdentifier` maps `NodeId`+`Clock` to a blink `Level` sequence, testable with `ManualClock`; `NodeIdCollisionGuard` distinguishes collision-vs-self from collision-vs-unrelated node, pure. None of these are wired into `ControllerNode`/`main.cpp` yet (mirrors #15→#16 and #17→#18 splits — no boot-time id-collision-checking or runtime identify-blink-handling logic exists yet). |
 | Config-validity boot gate (Backlog #22) | ✅ Done | Commits `df47bd4` (`BootMode`/`BootModeSelector` domain classes), `7cd9def` (wired into `src/main.cpp`). `ControllerNode` construction is now gated on config validity: if `NodeConfig::validate()` fails, board enters `BootMode::NeedsCommissioning` and runs only the serial commissioning channel, postponing adapter/MQTT construction until config is saved and valid. `BootModeSelector::select` is a pure function of `NodeConfig::validate()`'s result — no hardware/pin state involved. Tested with `test_boot_mode_selector` (native). |
 | Wireless setup mode boot logic | ✅ Done | Commits `739b1df` (extend `BootMode`/`BootModeSelector` with `WirelessSetup` mode), `6fbcb44` (wire `ButtonSetupModeTrigger`/`WebFormCommissioningAdapter`/`EspDeviceIdentity`/`CaptivePortalServer` into `src/main.cpp`). `BootModeSelector::select` now takes a `wirelessSetupRequested` flag; if true, board enters `BootMode::WirelessSetup` and runs wireless commissioning via captive-portal web form; if false, falls back to normal-vs-needs-commissioning logic based on config validity. Holding BOOT through power-on signals wireless setup request. |
+| Field identification + collision guard wiring (Backlog #25) | ✅ Done | Commits `cc7ca03` (`MqttTopicRouter`), `319297e` (`MqttLink::subscribe`), `9d754f4` (migrate `MqttCommandSource`), `a7cbf8e` (`SteadyBlinker`), `d0453a4` (`ControllerNode` presence/collision wiring), `7e4136c` (`Deadline::armed()`), `45a0889` (`src/main.cpp` wiring). Status LED is GPIO 2. `MqttLink` now owns `PubSubClient`'s one callback slot via a new `MqttTopicRouter`, dispatching by exact topic match, so the presence-topic subscription and the 8 turnout-command subscriptions can coexist. A short BOOT press in `BootMode::Normal` blinks the node's id via `BlinkOutIdentifier` for 5 seconds; `ControllerNode::begin()` gives a pre-existing retained presence message a bounded 500ms window to arrive before announcing itself, and if `NodeIdCollisionGuard` reports a collision, skips both the announce and turnout-command subscription, exposing `blocked()` so `main.cpp` drives `SteadyBlinker`'s distinct steady-fast pattern on the same LED instead. |
 
 Build Order steps 1–11 (`docs/software-class-list.md`) are complete, plus the
 Node Configuration & Commissioning groundwork (`NodeConfig`/`ConfigStore`)
@@ -83,9 +84,10 @@ blocked by is done.
 - A board in `BootMode::NeedsCommissioning` (invalid config, BOOT not held)
   currently gives no visual signal — it silently runs only the serial
   commissioning channel with no turnout/MQTT activity. A distinct LED blink
-  pattern is deferred to backlog #25, which needs a status-LED GPIO pin
-  decision first. This was an explicit, approved scope boundary for plan #22,
-  not an oversight.
+  pattern is not yet implemented — the status LED (GPIO 2, wired for field
+  identification/collision-error blinking) could reuse the same physical LED
+  with a third pattern, but no task currently owns this. This was an
+  explicit, approved scope boundary for plan #22, not an oversight.
 - `CaptivePortalServer`'s served form (task #19) collects `id`, `wifi_ssid`,
   `wifi_password`, `broker_host`, `broker_port` only — no turnout pin/feedback
   fields. On factory-default boards (all 8 turnouts with sentinel pins -1/-1),
@@ -98,8 +100,3 @@ blocked by is done.
   `factoryDefault()` valid non-conflicting per-slot defaults, or change
   `validate()`'s sentinel-pin handling). Deferred rather than fixed in this
   branch, since `CaptivePortalServer` is not yet wired into the composition root.
-- `ButtonIdentifyRequestTrigger`, `BlinkOutIdentifier`, `NodeIdCollisionGuard`,
-  and `MqttNodePresenceReporter` (task #20) are not yet wired into
-  `ControllerNode`/`src/main.cpp` — no boot-time id-collision-checking or
-  runtime identify-blink-handling logic exists yet in the composition root
-  (wiring is deferred to a future task).
