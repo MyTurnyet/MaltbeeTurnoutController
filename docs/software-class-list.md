@@ -413,7 +413,15 @@ BOOT button and status LED.
 
 ### Entering Setup Mode
 
-Hold **BOOT** while powering on. The node skips normal startup and instead:
+Press and hold **BOOT** for about 3 seconds during normal operation, then
+release it — not while powering on. (GPIO0, the BOOT pin, is also the
+ESP32's own boot-strapping pin: holding it low through a power-on or reset
+puts the chip's ROM bootloader into permanent UART download mode before any
+application code runs, so this gesture can only be detected live, after the
+board has already booted normally — the same reason
+`ButtonIdentifyRequestTrigger`'s short-press already works this way.)
+Releasing after a qualifying hold reboots the node, which then skips normal
+startup and instead:
 
 1. Starts its own WiFi access point named `Tortoise-Setup-<last 4 hex digits of MAC>`
    (e.g. `Tortoise-Setup-3F2A`). The MAC is used here only because the node
@@ -428,6 +436,11 @@ Hold **BOOT** while powering on. The node skips normal startup and instead:
 4. On submit, the node validates and reboots into normal operation with the
    new config.
 
+A factory-fresh board with no valid config yet (`BootMode::NeedsCommissioning`)
+still watches for this same hold-and-release gesture — it's the only way
+such a board reaches wireless setup, since it has no `ControllerNode`
+running yet either.
+
 If several new boards are being set up at once, the customer identifies
 *which* physical board they're talking to by its blinking "setup mode" LED
 and the AP name shown in their WiFi list — both trace back to a specific
@@ -438,7 +451,9 @@ board without needing to already know its id.
 | Class | Layer | Responsibility |
 |---|---|---|
 | `SetupModeTrigger` | Port | `bool requested()` — was BOOT held through the boot window? |
-| `ButtonSetupModeTrigger` | Adapter | Reads the BOOT pin during `ControllerNode`'s construction |
+| `ButtonSetupModeTrigger` | Adapter | Polls the BOOT pin during normal runtime (`loop()`), firing when a hold of at least the configured duration is released |
+| `SetupModeRequestStore` | Port | `void requestOnNextBoot()` / `bool consumeRequest()` — persists "enter wireless setup" across the reboot the runtime hold-and-release triggers |
+| `NvsSetupModeRequestStore` | Adapter | Persists the pending-setup flag in NVS (`Preferences`), in a namespace separate from `NodeConfig` |
 | `CaptivePortalServer` | Adapter | Runs the AP, DNS capture, and HTTP server; serves the setup page |
 | `WebFormCommissioningAdapter` | Adapter | Parses HTTP POST fields into the same `ParsedCommand` values used by `CommandLineParser`, hands them to `CommissioningSession` |
 | `DeviceIdentity` | Port | `MacAddress mac()` — read-only hardware identity, used only for setup-AP naming |
@@ -450,8 +465,9 @@ both translate an external input format into `ParsedCommand`s for the same
 
 ### Field Identification: Blink-Out
 
-A **short press** of BOOT during normal operation (not held through
-power-up, so it doesn't trigger setup mode) makes the status LED blink the
+A **short press** of BOOT during normal operation (shorter than the
+setup-mode hold, so it doesn't trigger setup mode) makes the status LED
+blink the
 node's id N times, then pause and repeat for a few seconds. Lets someone
 standing under the layout confirm "this is node 4" without a phone, once a
 node has actually been assigned an id.

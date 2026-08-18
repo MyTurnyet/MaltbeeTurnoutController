@@ -26,14 +26,13 @@ Identification").
 
 ## Step 1: Enter Setup Mode
 
-1. Press and hold the board's **BOOT** button.
-2. While still holding it, power on the board (plug it in, or press its
-   reset button if it's already powered).
-3. Keep holding **BOOT** for a couple of seconds after power comes on —
-   about 3 seconds total is a safe margin. Then release it.
+1. Make sure the board is already powered on and running normally — don't
+   hold BOOT while plugging it in or resetting it.
+2. Press and hold the board's **BOOT** button for about 3 seconds, then
+   release it.
 
-If BOOT was held through that window, the board skips normal startup and
-starts its own WiFi network instead of joining yours.
+Releasing BOOT after that hold reboots the board into setup mode: it skips
+normal startup and starts its own WiFi network instead of joining yours.
 
 ## Step 2: Connect to the Board's WiFi Network
 
@@ -97,14 +96,16 @@ layout.
 
 You can re-run this whole process at any time — e.g. to move a board to a
 new WiFi network, or fix a duplicate node ID — by repeating Step 1. Holding
-BOOT through power-on always re-enters setup mode, even on a board that's
-already configured and working.
+BOOT for 3 seconds during normal operation, then releasing it, always
+re-enters setup mode, even on a board that's already configured and
+working.
 
 ## Troubleshooting
 
-- **Don't see `Tortoise-Setup-XXXX` in your WiFi list:** the BOOT hold
-  probably wasn't caught. Power off, hold BOOT, power back on, and hold for
-  a full 3 seconds before releasing, then check again.
+- **Don't see `Tortoise-Setup-XXXX` in your WiFi list:** the hold probably
+  wasn't caught, or was released too early. Make sure the board is fully
+  powered on and running first, then press and hold BOOT for a full 3
+  seconds and release it — check again after it reboots.
 - **The setup page didn't pop up automatically:** browse to
   `http://192.168.4.1` manually (Step 3).
 - **Turnouts don't move even though the board is online:** turnout wiring
