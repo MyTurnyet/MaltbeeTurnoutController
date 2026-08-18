@@ -21,6 +21,8 @@
 #include "adapters/MqttLink.h"
 #include "adapters/MqttPositionReporter.h"
 #include "adapters/MqttCommandSource.h"
+#include "adapters/MqttNodePresenceReporter.h"
+#include "domain/NodeIdCollisionGuard.h"
 
 class ControllerNode
 {
@@ -33,7 +35,37 @@ public:
     {
         wifiLink_.begin(config_.wifi());
         mqttLink_.begin(config_.broker());
-        commandSource_.subscribeAll(config_.id().value());
+
+        std::string presenceTopic = "node/" + std::to_string(config_.id().value()) + "/status";
+        mqttLink_.subscribe(presenceTopic, [this](const std::string& payload) {
+            if (payload != "online")
+            {
+                return;
+            }
+
+            if (collisionGuard_.evaluate(config_.id(), announcedSelf_) == PresenceVerdict::Collision)
+            {
+                blocked_ = true;
+            }
+        });
+
+        // Bounded clock-based spin so a pre-existing retained presence
+        // message for our id (from a different node/session already
+        // claiming it) has a chance to arrive before we decide whether to
+        // announce ourselves. Not a blocking delay() - runs once during
+        // begin(), same pattern as src/main.cpp's boot-window detection.
+        Instant start = clock_.now();
+        while (clock_.now() - start < Duration(kPresenceCheckWindowMs))
+        {
+            mqttLink_.poll();
+        }
+
+        if (!blocked_)
+        {
+            presenceReporter_.announce(config_.id());
+            announcedSelf_ = true;
+            commandSource_.subscribeAll(config_.id().value());
+        }
     }
 
     void tick()
@@ -41,6 +73,16 @@ public:
         wifiLink_.poll();
         mqttLink_.poll();
         registry_.tick(clock_.now());
+    }
+
+    // True if a different session already claimed this node's id (retained
+    // "online" observed on our own presence topic before we announced
+    // ourselves). While true, turnout commands were never subscribed to -
+    // src/main.cpp drives a distinct error blink pattern instead of the
+    // normal identify blink.
+    bool blocked() const
+    {
+        return blocked_;
     }
 
 private:
@@ -62,6 +104,7 @@ private:
     // the motion state machine ever sees a position.
     static constexpr unsigned long kFeedbackDebounceMs = 20;
     static constexpr unsigned long kLinkRetryMs = 5000;
+    static constexpr unsigned long kPresenceCheckWindowMs = 500;
 
     NvsConfigStore configStore_;
     const NodeConfig config_{configStore_.load()};
@@ -135,6 +178,11 @@ private:
                     positionReporter_)}};
 
     MqttCommandSource commandSource_{mqttLink_, registry_};
+
+    MqttNodePresenceReporter presenceReporter_{mqttLink_};
+    NodeIdCollisionGuard collisionGuard_{config_.id()};
+    bool announcedSelf_ = false;
+    bool blocked_ = false;
 };
 
 #endif
