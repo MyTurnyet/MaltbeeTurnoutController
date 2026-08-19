@@ -33,6 +33,16 @@ public:
         }
     }
 
+    // Edge-triggered: true if a turnout command was successfully decoded
+    // and dispatched since the last call, then clears back to false. Lets
+    // src/main.cpp drive an LED flash without polling per-turnout state.
+    bool consumeReceived()
+    {
+        bool wasReceived = receivedThisTick_;
+        receivedThisTick_ = false;
+        return wasReceived;
+    }
+
 private:
     void handle(TurnoutId id, const std::string& payload)
     {
@@ -43,10 +53,12 @@ private:
         }
 
         sink_.command(id, *position);
+        receivedThisTick_ = true;
     }
 
     MqttLink& link_;
     TurnoutCommandSink& sink_;
+    bool receivedThisTick_ = false;
 };
 
 #endif
