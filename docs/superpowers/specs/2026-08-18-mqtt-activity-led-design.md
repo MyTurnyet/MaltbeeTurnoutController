@@ -92,9 +92,8 @@ Called from `main.cpp` once per `loop()` iteration, right after
 ### `src/main.cpp` (modified, composition root only)
 
 Adds:
-- Two new constants: `kMqttFlashOnMs = 80`, `kMqttFlashOffMs = 80`,
-  `kMqttFlashCount = 3` (or equivalent — exact constant shape decided at
-  implementation time).
+- Three new constants: `kMqttFlashOnMs = 80`, `kMqttFlashOffMs = 80`,
+  `kMqttFlashCount = 3`.
 - A file-scope `Deadline mqttActivityDeadline;` and `Instant
   mqttActivityStart(0);` (plain domain value objects — safe as ordinary
   statics, same rule already documented for `identifyDeadline`).
