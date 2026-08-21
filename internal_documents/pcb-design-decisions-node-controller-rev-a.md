@@ -3,17 +3,17 @@
 Companion to the project notes (rev 2) and the breadboard prototype doc. Covers build-sequence step 5: KiCad layout and fabrication.
 
 Created 21 August 2026, on completion of the breadboard prototype through §7.
+**Updated 21 August 2026** — open item 3a closed (measurements below); LM2596 moved off-board; power input split into two separate terminals.
 
 ---
 
 ## 0. Status
 
-**Not yet started in KiCad.** Two things gate the schematic:
+**Not yet started in KiCad.** One thing still gates the schematic:
 
 1. **Breadboard §8/§9 feedback verification.** Until `fb1` and `fb2` track `cmd` reliably in the serial monitor, two of the five claims in the prototype doc's §10 are unproven — including whether the input-only pins behave with external pull-ups, which is eight resistor footprints on this board.
-2. **Open item 3a footprint measurements** (§6 below).
 
-Everything else on this page is decided.
+**Open item 3a footprint measurements — closed.** See §6. Everything else on this page is decided.
 
 ---
 
@@ -21,11 +21,15 @@ Everything else on this page is decided.
 
 One node: 8 turnout channels, WiFi/MQTT, position feedback. Socketed ESP32 and TB6612 modules. No enclosure.
 
+**LM2596 buck converter is off-board.** Mounted as a separate unit immediately ahead of where the node board itself mounts, wired in via the 5 V input terminal. See §4. This removes the module from the socket-everything rule in project notes §3.8 — there is no LM2596 footprint, socket, or mounting-hole allowance on this PCB.
+
 **Explicitly out of scope for Rev A:**
 
 - **Frog polarity.** Not routed through this board at all. Wire it at the machine off contact set 1 if it's ever wanted. Keeping locomotive-level DCC current off a logic board is worth more than the convenience, and it saves 24 terminal poles.
 - **Two-sensor feedback.** Needs a second GPIO and a terminal pole per channel. A first board shouldn't be padded with speculation — that's what Rev B is for.
 - **Fascia indication.** Contact set 1 could drive a bicolour LED passively, with no controller involvement. Wire it at the machine if wanted.
+- **On-board 5 V regulation.** See above — the LM2596 lives off-board now.
+- **Reverse-polarity protection on the 5 V input.** See §4. Deferred to Rev B.
 
 ---
 
@@ -33,22 +37,27 @@ One node: 8 turnout channels, WiFi/MQTT, position feedback. Socketed ESP32 and T
 
 **Screw terminals, 5.08 mm pitch, horizontal wire entry.**
 
-Pitch reasoning: 32 poles at 5.08 mm is 163 mm of edge, which splits across two edges as ~81 mm each and stays inside a 100 × 100 mm outline — where the low-cost fab price breaks sit. 3.5 mm would fit more easily but is genuinely unpleasant to drive while lying on your back under benchwork, which is exactly the position 32 terminations will be made in.
+Confirmed against the actual parts on hand (§6): pitch, depth, and per-pole width all land cleanly on 5.08 mm and its multiples, and the interlock joint between adjacent blocks introduces no discontinuity — chaining blocks keeps pins on a continuous 5.08 mm grid straight across a multi-block run.
 
 ### Pole budget
 
 | Block | Poles | Contents |
-|---|---|---|
+| :---- | :---- | :---- |
 | 8 × 4-pole (one per channel) | 32 | Motor +, motor −, feedback, feedback common |
 | 1 × 2-pole | 2 | 12 V bus in |
-| **Total** | **34** | |
+| 1 × 2-pole | 2 | 5 V bus in |
+| **Total** | **36** | |
+
+Was 34 (one combined 2-pole for power). Now two separate 2-pole blocks — see §4 for why.
+
+At 5.08 mm, 36 poles is 182.9 mm of edge, splitting across two edges as ~91 mm each — still comfortably inside a 100 × 100 mm outline.
 
 Four-pole blocks, one per channel, rather than ganged two-pole. Silkscreen reads `CH1  M1  M8  FB  COM` and a miswire is visible at a glance.
 
 ### Terminal pin mapping
 
 | Pole | Tortoise pin | Note |
-|---|---|---|
+| :---- | :---- | :---- |
 | M1 | 1 | Motor winding |
 | M8 | 8 | Motor winding |
 | FB | 6 | Contact set 2, one throw |
@@ -62,12 +71,12 @@ A per-channel ground pole rather than daisy-chaining commons under the layout. C
 
 ## 3. Schematic structure — hierarchical
 
-**Root sheet:** ESP32, LM2596, 4 × TB6612, 2 × 74HC04, all decoupling, 12 V terminal block, status LED, eight instances of the channel sheet.
+**Root sheet:** ESP32, 4 × TB6612, 2 × 74HC04, all decoupling, 12 V terminal block, 5 V terminal block, status LED, eight instances of the channel sheet. No LM2596 on this sheet — it's off-board.
 
 **Channel sheet** (`channel.kicad_sch`, instantiated 8×): 4-pole screw terminal, 10 kΩ pull-up, and the nets between hierarchical pins.
 
 | Hierarchical pin | Type |
-|---|---|
+| :---- | :---- |
 | `CTRL_DIRECT` | input |
 | `CTRL_INV` | input |
 | `FB` | output |
@@ -83,7 +92,7 @@ So the channel sheet owns only what is genuinely per-channel, and the shared plu
 ### Channel allocation
 
 | Ch | GPIO out | FB in | TB6612 | Bridge | 74HC04 | Inverter (in→out) |
-|---|---|---|---|---|---|---|
+| :---- | :---- | :---- | :---- | :---- | :---- | :---- |
 | 1 | 13 | 36 | U1 | A | U5 | 1 → 2 |
 | 2 | 14 | 39 | U1 | B | U5 | 3 → 4 |
 | 3 | 27 | 34 | U2 | A | U5 | 5 → 6 |
@@ -100,7 +109,7 @@ Each `CHn_D` net fans out to two loads: the TB6612 input and the corresponding i
 ### Fixed ties
 
 | Signal | Tie to |
-|---|---|
+| :---- | :---- |
 | `PWMA`, `PWMB` (all 4 modules) | `+3V3` |
 | `STBY` (all 4 modules) | `STBY` net → GPIO 2 |
 | GPIO 2 | 10 kΩ pull-down to `GND` |
@@ -113,28 +122,41 @@ Each `CHn_D` net fans out to two loads: the TB6612 input and the corresponding i
 
 ## 4. Power
 
-| Net | Source | Loads |
-|---|---|---|
-| `+12V` | J1-1, via fuse and reverse-polarity device | LM2596 `IN+`, 4 × TB6612 `VM`, 4 × 470 µF |
-| `+5V` | LM2596 `OUT+` | ESP32 `VIN` |
-| `+3V3` | ESP32 `3V3` | 2 × 74HC04 pin 14, 4 × TB6612 `VCC`, 8 × pull-ups, PWMA/PWMB |
-| `GND` | J1-2 | everything |
+**LM2596 is off-board.** The node no longer performs its own 12 V→5 V conversion. Two independent supplies arrive at the board's edge instead of one.
 
-**Reverse polarity protection and a 1 A fuse on the 12 V input.** Backwards 12 V into four `VM` pins is an expensive mistake to make once, and with no enclosure the terminal block is exposed under the layout next to a track bus.
+| Net | Source | Loads |
+| :---- | :---- | :---- |
+| `+12V` | J1 (2-pole, near TB6612 bank) | 4 × TB6612 `VM`, 4 × 470 µF |
+| `+5V` | J2 (2-pole, near ESP32 socket) | ESP32 `VIN` |
+| `+3V3` | ESP32 `3V3` | 2 × 74HC04 pin 14, 4 × TB6612 `VCC`, 8 × pull-ups, PWMA/PWMB |
+| `GND` | shared, no dedicated terminal | everything |
+
+### Why two terminals instead of one combined block
+
+A single 3-pole block (12V / 5V / GND) was considered and rejected. Two separate 2-pole blocks, physically placed near what they feed — `+5V` by the ESP32 socket, `+12V` by the TB6612 bank — puts real distance between two different voltage sources rather than adjacent poles on one connector. A wiring mistake now requires running a wire across the whole board to the wrong end, not just missing a pole by one. Silkscreen reinforces it: bold, distinct `5V IN` and `12V IN` labels at opposite corners.
+
+This also shortens both traces relative to a single central power entry, since each supply lands next to its own load.
+
+### Protection — asymmetric, deliberately
+
+| Net | Protection |
+| :---- | :---- |
+| `+12V` | 1 A fuse + reverse-polarity diode (Schottky or P-FET) |
+| `+5V` | **None.** |
+
+The 12 V input is exposed under the layout with no enclosure, and backwards 12 V into four `VM` pins is an expensive mistake to make once. The 5 V input is equally exposed and feeds the ESP32's `VIN` directly with nothing else on this board standing between a wiring error and the dev board.
+
+A series diode was considered for the 5 V line and rejected for this revision: the ~0.3–0.5 V drop eats into the margin the ESP32's onboard AMS1117 needs (roughly 4.5–4.75 V in to hold a clean 3.3 V out), risking brownouts rather than preventing damage. The correct fix is a P-channel MOSFET, which avoids the drop — but that's a real design addition, not a drop-in part, and is **deferred to Rev B** (§10). For Rev A, physical separation and clear labeling are the mitigation.
 
 ### Decoupling
 
 | Part | Qty | Placement |
-|---|---|---|
+| :---- | :---- | :---- |
 | 100 nF | 2 | 74HC04 pins 14–7, as close as the footprint allows |
 | 100 nF | 4 | TB6612 `VCC`–`GND`, one per module |
 | 470 µF, ≥25 V | 4 | `+12V` to `GND`, one adjacent to each TB6612 |
 
 The BOM was sized for a single-module prototype and lists one 470 µF. Four are needed.
-
-### LM2596
-
-On female headers, per the socket-everything rule. **Check pot accessibility with the module seated** — it will need re-trimming in place.
 
 ---
 
@@ -158,11 +180,19 @@ See project notes §4. Bridges stay disabled until firmware asserts them, so boo
 
 5 mm red, board-mounted, GPIO 23 through 330 Ω to the anode, cathode to ground. ~4 mA at 3.3 V — clearly visible without being glaring in a dark layout room. Standard `LED_D5.0mm` footprint, 2.54 mm lead spacing, no measurement needed.
 
-Placement: board edge, opposite side from the terminal blocks, clear of the ESP32 body and the LM2596. A shadowed indicator is a useless one. Silkscreen `STATUS` and mark the cathode flat.
+Placement: board edge, opposite side from the terminal blocks, clear of the ESP32 body. A shadowed indicator is a useless one. Silkscreen `STATUS` and mark the cathode flat.
 
 Red rather than blue or white deliberately — Vf ≈ 2.0 V leaves adequate headroom across the resistor at 3.3 V, where a 3.0 V Vf would make brightness swing with supply tolerance.
 
 Optional: a two-pole footprint in parallel, left unpopulated, so a fascia indicator can be added later without a board revision. Costs nothing as DNP.
+
+### ESP32 socket and USB-C overhang
+
+Dev board confirmed USB-C (project notes §2), not micro-B as an earlier draft of this checklist assumed.
+
+**Decided: let the connector overhang the board edge rather than cutting a slot.** Slide the ESP32 in its socket so the USB-C connector projects past the PCB edge into open air. No edge cutout needed, and the exact overhang dimension stops being a layout-blocking measurement — it only needs clearance, not a matched cutout.
+
+Consequence for placement: inset the ESP32 socket footprint from that board edge by roughly the ESP32's own board-to-connector-edge distance (~5 mm, see §6) plus margin, so the *connector* overhangs but the *ESP32 board* stays fully seated on the socket. Check this against the nearest M3 standoff when placing parts on the 1:1 printed layout (§8) — confirm the overhanging connector and any cable plugged into it don't collide with the standoff.
 
 ### Mounting
 
@@ -176,30 +206,38 @@ M3 nylon standoffs (on hand). Nylon rather than metal, for the same isolation re
 
 ### No enclosure
 
-Board mounts open on standoffs. Two consequences:
+Board mounts open on standoffs. Consequences:
 
-- Label the 12 V block clearly on silkscreen (`12V +` / `−`). It's exposed, under the layout, near a track bus that may carry more current.
+- Label both power blocks clearly on silkscreen (`12V +` / `−` and `5V +` / `−`). Both are exposed, under the layout, near a track bus that may carry more current.
 - Orient the board so terminal screws face outward — terminations will be made as much by feel as by sight.
 
 ---
 
-## 6. Open item 3a — footprint measurement checklist
+## 6. Open item 3a — footprint measurements (closed)
 
-**Not yet done. Prerequisite for layout.**
+All measured against parts on hand rather than datasheets. Every through-hole part checked landed cleanly on the 2.54 mm grid family — a useful pattern for anything ambiguous later.
 
-Digital calipers. Measure across N pitches and divide by N; a single 2.54 mm gap measured alone gives useless precision.
-
-| Part | Measure | Why it matters |
-|---|---|---|
-| ESP32 dev board | Row centre-to-centre; pitch across all 14 gaps; body L×W; pin length below board | Row spacing is the one that bites — this board already didn't fit a breadboard cleanly |
-| ESP32 USB connector | Type (micro-B on the ELEGOO), overhang past board edge, plug clearance | May need an edge cutout |
-| TB6612 × 4 | Row spacing, pins per row, **pin order against silkscreen — all four modules** | Generic modules vary between batches. This is the one that produces a board where nothing works and everything measures correct. |
-| Screw terminals | Pitch verified across 8+ poles; body depth and height; pin diameter; wire entry direction; whether they interlock, and the pitch across an interlock joint | Pin diameter sets drill size; depth eats board area behind the edge |
-| DIP-14 sockets | Row spacing, lead thickness | Nominal 0.3", verify |
-| 470 µF cap | Body diameter, lead spacing, height | Lead spacing varies 3.5–7.5 mm at this size |
-| LM2596 module | Outline, mounting hole spacing, **pot accessibility when seated** | Needs re-trimming in place |
-
-Record results here as a table when measured.
+| Part | Measured | Method |
+| :---- | :---- | :---- |
+| ESP32 dev board — row spacing | **25.4 mm** (0.1″ × 10) | Seated on perfboard, pin row 1 to row 11 |
+| ESP32 dev board — body length | **≈45.72 mm** (35.56 mm pin span + 5.08 mm overhang each end) | Perfboard grid count, both ends |
+| ESP32 dev board — body width | No side clearance — board edge sits at the pin row | Visual, top-down |
+| ESP32 USB connector | **USB-C**, confirmed | Visual — corrects earlier micro-B assumption |
+| ESP32 USB overhang past board edge | Not measured — moot, see §5 | Design choice: overhang past PCB edge rather than cutout |
+| TB6612 × 4 — row spacing | **15.24 mm** (0.6″ × 6) | Perfboard grid count |
+| TB6612 × 4 — pin order vs. silkscreen | **Confirmed correct, all four modules, checked individually** | Visual read-off against each module's own printed labels |
+| Screw terminals — pitch | **5.08 mm** | Perfboard grid, pins land every other hole |
+| Screw terminals — depth | **5.08 mm** (3 holes = 2 gaps) | Perfboard grid |
+| Screw terminals — width per pole | **n × 5.08 mm** (2-pole = 10.16 mm, 3-pole = 15.24 mm) | Perfboard grid, confirms clean formula |
+| Screw terminals — pin diameter | Fits standard perfboard hole (~1 mm) with no forcing | Fit test |
+| Screw terminals — wire entry direction | **Horizontal** | Visual |
+| Screw terminals — interlock pitch | **5.08 mm across the joint** — no discontinuity | Two blocks clipped together, perfboard grid |
+| DIP-14 — row spacing | **7.62 mm** (0.3″ × 3) | Perfboard grid |
+| DIP-14 — lead thickness / body width | Standard wide-body 0.3″ confirmed | Soldered to PCB without issue |
+| 470 µF cap — body diameter | **10 mm** | Manufacturer spec |
+| 470 µF cap — body height | **12.5 mm** | Manufacturer spec |
+| 470 µF cap — lead spacing | **5.08 mm** (0.2″) | Perfboard grid — clean drop into holes 1 and 3, no lead spring |
+| LM2596 module | **N/A — moved off-board**, see §1 | — |
 
 ---
 
@@ -207,7 +245,7 @@ Record results here as a table when measured.
 
 Nothing on this board is fine-pitch and the 12 V rail carries ~400 mA. Default 6/6 mil rules at any house are far more than adequate. **Choose on cost and lead time, not capability.**
 
-Target outline: under 100 × 100 mm, where the low-cost price breaks sit.
+Target outline: under 100 × 100 mm, where the low-cost price breaks sit. At 36 poles / 5.08 mm split across two edges (~91 mm each), still comfortably inside that target.
 
 ---
 
@@ -215,20 +253,20 @@ Target outline: under 100 × 100 mm, where the low-cost price breaks sit.
 
 Test-first in spirit — catch errors at instance one, not eight.
 
-1. Complete 3a measurements; record above.
+1. ~~Complete 3a measurements; record above.~~ **Done — see §6.**
 2. Build or verify footprints against measured parts.
 3. Draw the channel sheet. ERC clean with a **single** instance.
 4. Instantiate the remaining seven.
 5. Draw the root sheet. Full ERC.
 6. Layout: mounting holes and terminal edges placed first, then modules, then routing.
-7. **Print the layout 1:1 and place real parts on the paper.** Catches footprint errors for the cost of a sheet of paper.
+7. **Print the layout 1:1 and place real parts on the paper.** Catches footprint errors for the cost of a sheet of paper. Check ESP32/USB-C overhang clearance against the nearest standoff at this step.
 8. Gerber review, then order.
 
 ---
 
 ## 9. ERC notes
 
-- `PWR_FLAG` on `+12V`, `+5V` and `+3V3`. None of them originates from a symbol KiCad recognises as a source — the LM2596 and the ESP32 are both modules.
+- `PWR_FLAG` on `+12V`, `+5V` and `+3V3`. None of them originates from a symbol KiCad recognises as a source — both power nets now arrive from external terminal blocks rather than an on-board regulator, and the ESP32 is a module.
 - Add the four mounting holes to the schematic now. Retrofitting them after layout means moving traces.
 
 ---
@@ -236,8 +274,9 @@ Test-first in spirit — catch errors at instance one, not eight.
 ## 10. Deferred to Rev B
 
 | Item | Why not now |
-|---|---|
+| :---- | :---- |
 | Bare SSOP-24 TB6612FNG instead of modules | Cheaper and more compact, but 0.65 mm pitch soldering and support passives |
 | Two-sensor feedback | Second GPIO and terminal pole per channel |
 | Fascia indicator terminal | DNP footprint reserved on Rev A |
 | Frog polarity routing | Deliberate — keeps track current off the board |
+| MOSFET reverse-polarity protection on `+5V` | Real design addition, not a drop-in part; Rev A relies on physical separation and labeling instead |
