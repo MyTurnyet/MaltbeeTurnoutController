@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "domain/Instant.h"
 #include "domain/Duration.h"
 
@@ -33,7 +35,7 @@ public:
         // signed correctly reports "at or past deadline" across a single
         // wrap, as long as the deadline is never more than ~24.8 days
         // (2^31 ms) out - true for every duration this firmware arms.
-        long elapsedSinceDeadline = static_cast<long>((now - deadline_).milliseconds());
+        int32_t elapsedSinceDeadline = static_cast<int32_t>((now - deadline_).milliseconds());
         return elapsedSinceDeadline >= 0;
     }
 

@@ -1,13 +1,15 @@
 #pragma once
 
+#include <cstdint>
+
 class Duration
 {
 public:
-    explicit Duration(unsigned long milliseconds) : milliseconds_(milliseconds)
+    explicit Duration(uint32_t milliseconds) : milliseconds_(milliseconds)
     {
     }
 
-    unsigned long milliseconds() const
+    uint32_t milliseconds() const
     {
         return milliseconds_;
     }
@@ -43,5 +45,5 @@ public:
     }
 
 private:
-    unsigned long milliseconds_;
+    uint32_t milliseconds_;
 };

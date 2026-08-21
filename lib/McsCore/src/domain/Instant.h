@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstdint>
+
 #include "domain/Duration.h"
 
 class Instant
 {
 public:
-    explicit Instant(unsigned long milliseconds) : milliseconds_(milliseconds)
+    explicit Instant(uint32_t milliseconds) : milliseconds_(milliseconds)
     {
     }
 
@@ -50,5 +52,5 @@ public:
     }
 
 private:
-    unsigned long milliseconds_;
+    uint32_t milliseconds_;
 };
