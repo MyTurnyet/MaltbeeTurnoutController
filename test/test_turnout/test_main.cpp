@@ -105,3 +105,38 @@ TEST_CASE("Feedback confirming the commanded position eventually settles and rep
     REQUIRE(reporter.reports()[0].state == TurnoutState::Moving);
     REQUIRE(reporter.reports()[1].state == TurnoutState::Thrown);
 }
+
+TEST_CASE("reportCurrent republishes the current state even when it already matches the last report")
+{
+    FakeDigitalOutput output;
+    FakeDigitalInput input;
+    Orientation orientation = Orientation::normal();
+    FeedbackSensor sensor(input, orientation, Duration(50));
+    TurnoutMotion motion(TurnoutPosition::closed(), Duration(200), Duration(50));
+    FakePositionReporter reporter;
+    Turnout turnout(TurnoutId(1), output, orientation, std::move(sensor), std::move(motion), reporter);
+    turnout.tick(Instant(0));
+
+    turnout.reportCurrent();
+
+    REQUIRE(reporter.reports().size() == 2);
+    REQUIRE(reporter.reports()[1].id == TurnoutId(1));
+    REQUIRE(reporter.reports()[1].state == TurnoutState::Closed);
+}
+
+TEST_CASE("reportCurrent before any tick means the next tick does not duplicate the report")
+{
+    FakeDigitalOutput output;
+    FakeDigitalInput input;
+    Orientation orientation = Orientation::normal();
+    FeedbackSensor sensor(input, orientation, Duration(50));
+    TurnoutMotion motion(TurnoutPosition::closed(), Duration(200), Duration(50));
+    FakePositionReporter reporter;
+    Turnout turnout(TurnoutId(1), output, orientation, std::move(sensor), std::move(motion), reporter);
+
+    turnout.reportCurrent();
+    turnout.tick(Instant(0));
+
+    REQUIRE(reporter.reports().size() == 1);
+    REQUIRE(reporter.reports()[0].state == TurnoutState::Closed);
+}
