@@ -56,6 +56,14 @@ public:
         }
     }
 
+    void reportAll()
+    {
+        for (auto& turnout : turnouts_)
+        {
+            turnout.reportCurrent();
+        }
+    }
+
 private:
     int nodeId_;
     std::array<Turnout, TurnoutsPerNode> turnouts_;

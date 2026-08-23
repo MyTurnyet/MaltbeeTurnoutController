@@ -179,3 +179,54 @@ TEST_CASE("TurnoutRegistry satisfies TurnoutCommandSink through a base-class ref
 
     REQUIRE(outputs[4].level() == Level::High);
 }
+
+TEST_CASE("reportAll reports every turnout's current state, in id order")
+{
+    std::array<FakeDigitalOutput, 8> outputs;
+    std::array<FakeDigitalInput, 8> inputs;
+    FakePositionReporter reporter;
+    std::array<Turnout, 8> turnouts{
+        makeTurnout(101, outputs[0], inputs[0], reporter),
+        makeTurnout(102, outputs[1], inputs[1], reporter),
+        makeTurnout(103, outputs[2], inputs[2], reporter),
+        makeTurnout(104, outputs[3], inputs[3], reporter),
+        makeTurnout(105, outputs[4], inputs[4], reporter),
+        makeTurnout(106, outputs[5], inputs[5], reporter),
+        makeTurnout(107, outputs[6], inputs[6], reporter),
+        makeTurnout(108, outputs[7], inputs[7], reporter)
+    };
+    TurnoutRegistry registry(1, std::move(turnouts));
+
+    registry.reportAll();
+
+    REQUIRE(reporter.reports().size() == 8);
+    REQUIRE(reporter.reports()[0].id == TurnoutId(101));
+    REQUIRE(reporter.reports()[0].state == TurnoutState::Closed);
+    REQUIRE(reporter.reports()[7].id == TurnoutId(108));
+    REQUIRE(reporter.reports()[7].state == TurnoutState::Closed);
+}
+
+TEST_CASE("reportAll republishes every turnout even when nothing has changed since the last report")
+{
+    std::array<FakeDigitalOutput, 8> outputs;
+    std::array<FakeDigitalInput, 8> inputs;
+    FakePositionReporter reporter;
+    std::array<Turnout, 8> turnouts{
+        makeTurnout(101, outputs[0], inputs[0], reporter),
+        makeTurnout(102, outputs[1], inputs[1], reporter),
+        makeTurnout(103, outputs[2], inputs[2], reporter),
+        makeTurnout(104, outputs[3], inputs[3], reporter),
+        makeTurnout(105, outputs[4], inputs[4], reporter),
+        makeTurnout(106, outputs[5], inputs[5], reporter),
+        makeTurnout(107, outputs[6], inputs[6], reporter),
+        makeTurnout(108, outputs[7], inputs[7], reporter)
+    };
+    TurnoutRegistry registry(1, std::move(turnouts));
+    registry.tick(Instant(0));
+
+    registry.reportAll();
+
+    REQUIRE(reporter.reports().size() == 16);
+    REQUIRE(reporter.reports()[8].id == TurnoutId(101));
+    REQUIRE(reporter.reports()[15].id == TurnoutId(108));
+}
