@@ -192,6 +192,7 @@ void loop()
             {
                 identifyDeadline.arm(now, Duration(kIdentifyActiveMs));
                 identifyStart = now;
+                node->republishAllStatus();
             }
 
             bool identifying = identifyDeadline.armed() && !identifyDeadline.expired(now);

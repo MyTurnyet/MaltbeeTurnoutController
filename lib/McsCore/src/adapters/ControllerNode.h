@@ -75,6 +75,15 @@ public:
         registry_.tick(clock_.now());
     }
 
+    // Forces every turnout to republish its current status over MQTT,
+    // regardless of whether it has changed since the last publish. Used by
+    // the identify short-press so JMRI (or a human checking mosquitto_sub)
+    // can get a full resync on demand.
+    void republishAllStatus()
+    {
+        registry_.reportAll();
+    }
+
     // True if a different session already claimed this node's id (retained
     // "online" observed on our own presence topic before we announced
     // ourselves). While true, turnout commands were never subscribed to -
