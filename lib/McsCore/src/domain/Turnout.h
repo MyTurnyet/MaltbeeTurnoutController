@@ -50,6 +50,13 @@ public:
         }
     }
 
+    void reportCurrent()
+    {
+        TurnoutState current = motion_.state();
+        reporter_.report(id_, current);
+        lastReportedState_ = current;
+    }
+
     TurnoutId id() const
     {
         return id_;
