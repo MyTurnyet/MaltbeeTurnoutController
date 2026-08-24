@@ -43,3 +43,15 @@ TEST_CASE("splitIpv4Octets returns all-blank for the wrong number of parts")
 
     REQUIRE(octets == std::array<std::string, 4>{"", "", "", ""});
 }
+
+TEST_CASE("escapeHtml escapes ampersand, angle brackets, and quotes")
+{
+    std::string escaped = SetupFormRenderer::escapeHtml("Tom & Jerry's \"Layout\" <shed>");
+
+    REQUIRE(escaped == "Tom &amp; Jerry&#39;s &quot;Layout&quot; &lt;shed&gt;");
+}
+
+TEST_CASE("escapeHtml leaves ordinary text unchanged")
+{
+    REQUIRE(SetupFormRenderer::escapeHtml("Layout Room") == "Layout Room");
+}

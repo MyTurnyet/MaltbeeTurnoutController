@@ -65,4 +65,37 @@ public:
 
         return parts;
     }
+
+    // A saved SSID/password/broker value could contain HTML-significant
+    // characters - escape before embedding in an attribute value so it
+    // can't break the page or inject markup back into the same form.
+    static std::string escapeHtml(const std::string& text)
+    {
+        std::string escaped;
+        escaped.reserve(text.size());
+        for (char c : text)
+        {
+            switch (c)
+            {
+            case '&':
+                escaped += "&amp;";
+                break;
+            case '<':
+                escaped += "&lt;";
+                break;
+            case '>':
+                escaped += "&gt;";
+                break;
+            case '"':
+                escaped += "&quot;";
+                break;
+            case '\'':
+                escaped += "&#39;";
+                break;
+            default:
+                escaped += c;
+            }
+        }
+        return escaped;
+    }
 };
