@@ -153,3 +153,48 @@ TEST_CASE("WebFormCommissioningAdapter reports a validation error from save and 
     REQUIRE(response.rfind("ERROR", 0) == 0);
     REQUIRE_FALSE(store.saved().has_value());
 }
+
+TEST_CASE("WebFormCommissioningAdapter currentValues reflects an empty factory-default config")
+{
+    FakeConfigStore store;
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+
+    WebFormSubmission values = adapter.currentValues();
+
+    REQUIRE(values.nodeId == "");
+    REQUIRE(values.wifiSsid == "");
+    REQUIRE(values.wifiPassword == "");
+    REQUIRE(values.brokerHost == "");
+    REQUIRE(values.brokerPort == "1883");
+}
+
+TEST_CASE("WebFormCommissioningAdapter currentValues reflects a previously saved config")
+{
+    FakeConfigStore store;
+    Orientation orientation = Orientation::normal();
+    Duration settle(50);
+    Duration timeout(200);
+    std::array<TurnoutConfig, 8> seedTurnouts{
+        TurnoutConfig(TurnoutId(1), 21, 31, orientation, settle, timeout),
+        TurnoutConfig(TurnoutId(2), 22, 32, orientation, settle, timeout),
+        TurnoutConfig(TurnoutId(3), 23, 33, orientation, settle, timeout),
+        TurnoutConfig(TurnoutId(4), 24, 34, orientation, settle, timeout),
+        TurnoutConfig(TurnoutId(5), 25, 35, orientation, settle, timeout),
+        TurnoutConfig(TurnoutId(6), 26, 36, orientation, settle, timeout),
+        TurnoutConfig(TurnoutId(7), 27, 37, orientation, settle, timeout),
+        TurnoutConfig(TurnoutId(8), 28, 38, orientation, settle, timeout)};
+    NodeConfig seed(NodeId(5), WifiCredentials("Layout Room", "blue caboose 42"), BrokerAddress("192.168.1.50", 1883), seedTurnouts);
+    store.save(seed);
+
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+
+    WebFormSubmission values = adapter.currentValues();
+
+    REQUIRE(values.nodeId == "5");
+    REQUIRE(values.wifiSsid == "Layout Room");
+    REQUIRE(values.wifiPassword == "blue caboose 42");
+    REQUIRE(values.brokerHost == "192.168.1.50");
+    REQUIRE(values.brokerPort == "1883");
+}

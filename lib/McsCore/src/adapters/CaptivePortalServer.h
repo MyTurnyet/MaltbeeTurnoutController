@@ -13,6 +13,7 @@
 #include "domain/SetupApName.h"
 #include "domain/WebFormSubmission.h"
 #include "adapters/WebFormCommissioningAdapter.h"
+#include "domain/SetupFormRenderer.h"
 
 class CaptivePortalServer
 {
@@ -46,7 +47,7 @@ public:
 private:
     void handleRoot()
     {
-        webServer_.send(200, "text/html", kFormHtml);
+        webServer_.send(200, "text/html", SetupFormRenderer::render(adapter_.currentValues()).c_str());
     }
 
     void handleSubmit()
@@ -62,7 +63,11 @@ private:
         form.nodeId = webServer_.arg("id").c_str();
         form.wifiSsid = webServer_.arg("wifi_ssid").c_str();
         form.wifiPassword = webServer_.arg("wifi_password").c_str();
-        form.brokerHost = webServer_.arg("broker_host").c_str();
+        std::string brokerHostOctet1 = webServer_.arg("broker_host_1").c_str();
+        std::string brokerHostOctet2 = webServer_.arg("broker_host_2").c_str();
+        std::string brokerHostOctet3 = webServer_.arg("broker_host_3").c_str();
+        std::string brokerHostOctet4 = webServer_.arg("broker_host_4").c_str();
+        form.brokerHost = brokerHostOctet1 + "." + brokerHostOctet2 + "." + brokerHostOctet3 + "." + brokerHostOctet4;
         form.brokerPort = webServer_.arg("broker_port").c_str();
 
         for (size_t i = 0; i < form.turnouts.size(); ++i)
@@ -77,17 +82,6 @@ private:
 
         return form;
     }
-
-    static constexpr const char* kFormHtml =
-        "<html><body><h1>Tortoise Setup</h1>"
-        "<form method='POST' action='/submit'>"
-        "Node ID: <input name='id'><br>"
-        "WiFi SSID: <input name='wifi_ssid'><br>"
-        "WiFi Password: <input name='wifi_password' type='password'><br>"
-        "Broker Host: <input name='broker_host'><br>"
-        "Broker Port: <input name='broker_port'><br>"
-        "<input type='submit' value='Save'>"
-        "</form></body></html>";
 
     WebFormCommissioningAdapter& adapter_;
     MacAddress apMac_;
