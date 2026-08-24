@@ -7,6 +7,7 @@
 #include "domain/CommissioningSession.h"
 #include "domain/CommandLineParser.h"
 #include "domain/ParsedCommand.h"
+#include "domain/NodeConfig.h"
 
 class WebFormCommissioningAdapter
 {
@@ -45,6 +46,19 @@ public:
     bool rebootRequested() const
     {
         return rebootRequested_;
+    }
+
+    WebFormSubmission currentValues() const
+    {
+        const NodeConfig& config = session_.draft();
+
+        WebFormSubmission form;
+        form.nodeId = config.id().value() == 0 ? "" : std::to_string(config.id().value());
+        form.wifiSsid = config.wifi().ssid();
+        form.wifiPassword = config.wifi().password();
+        form.brokerHost = config.broker().host();
+        form.brokerPort = std::to_string(config.broker().port());
+        return form;
     }
 
 private:
