@@ -2,7 +2,6 @@
 
 #ifdef ARDUINO
 
-#include <Arduino.h>
 #include <WiFi.h>
 
 #include <string>
@@ -40,8 +39,6 @@ public:
 
     void poll()
     {
-        logStatusChange();
-
         if (WiFi.status() == WL_CONNECTED)
         {
             return;
@@ -65,28 +62,11 @@ private:
         lastAttempt_ = clock_.now();
     }
 
-    // Logs only on status transitions (not every poll) so a stuck retry
-    // loop doesn't flood the serial monitor - gives visibility into
-    // association failures (wrong SSID/password, no route after connect)
-    // that were previously silent.
-    void logStatusChange()
-    {
-        wl_status_t status = WiFi.status();
-        if (status == lastLoggedStatus_)
-        {
-            return;
-        }
-        lastLoggedStatus_ = status;
-        Serial.printf("[WiFiLink] status=%d ip=%s rssi=%d\n",
-                      status, WiFi.localIP().toString().c_str(), WiFi.RSSI());
-    }
-
     Clock& clock_;
     Duration retryInterval_;
     Instant lastAttempt_;
     std::string ssid_;
     std::string password_;
-    int lastLoggedStatus_ = -1;
 };
 
 #endif
