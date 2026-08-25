@@ -6,6 +6,22 @@
 
 #include "domain/SetupFormRenderer.h"
 
+namespace
+{
+std::string extractSelect(const std::string& html, const std::string& selectName)
+{
+    std::string marker = "name='" + selectName + "'>";
+    size_t start = html.find(marker);
+    if (start == std::string::npos)
+    {
+        return "";
+    }
+    size_t end = html.find("</select>", start);
+    return html.substr(start, end - start);
+}
+}
+
+
 TEST_CASE("splitIpv4Octets splits a valid dotted quad")
 {
     std::array<std::string, 4> octets = SetupFormRenderer::splitIpv4Octets("192.168.1.13");
@@ -123,4 +139,77 @@ TEST_CASE("render pre-fills the broker port")
     std::string html = SetupFormRenderer::render(values);
 
     REQUIRE(html.find("name='broker_port' type='number' value='1883'") != std::string::npos);
+}
+
+TEST_CASE("render includes a collapsed Advanced Turnout Wiring section")
+{
+    WebFormSubmission values;
+    values.brokerPort = "1883";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    REQUIRE(html.find("<details>") != std::string::npos);
+    REQUIRE(html.find("<summary>Advanced: Turnout Wiring</summary>") != std::string::npos);
+}
+
+TEST_CASE("render defaults each channel's pin dropdown to its documented GPIO when unset")
+{
+    WebFormSubmission values;
+    values.brokerPort = "1883";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    REQUIRE(extractSelect(html, "t1_pin").find("<option value='13' selected>13</option>") != std::string::npos);
+    REQUIRE(extractSelect(html, "t8_pin").find("<option value='4' selected>4</option>") != std::string::npos);
+}
+
+TEST_CASE("render defaults each channel's feedback pin dropdown to its documented GPIO when unset")
+{
+    WebFormSubmission values;
+    values.brokerPort = "1883";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    REQUIRE(extractSelect(html, "t1_fb").find("<option value='36' selected>36</option>") != std::string::npos);
+    REQUIRE(extractSelect(html, "t8_fb").find("<option value='19' selected>19</option>") != std::string::npos);
+}
+
+TEST_CASE("render selects a saved pin over the documented default")
+{
+    WebFormSubmission values;
+    values.brokerPort = "1883";
+    values.turnouts[0].pin = "19";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    std::string pinSelect = extractSelect(html, "t1_pin");
+    REQUIRE(pinSelect.find("<option value='19' selected>19</option>") != std::string::npos);
+    REQUIRE(pinSelect.find("<option value='13' selected>13</option>") == std::string::npos);
+}
+
+TEST_CASE("render defaults orientation to normal when unset and reflects a saved inverted value")
+{
+    WebFormSubmission values;
+    values.brokerPort = "1883";
+    values.turnouts[1].orientation = "inverted";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    REQUIRE(extractSelect(html, "t1_orientation").find("<option value='normal' selected>normal</option>") != std::string::npos);
+    REQUIRE(extractSelect(html, "t2_orientation").find("<option value='inverted' selected>inverted</option>") != std::string::npos);
+}
+
+TEST_CASE("render defaults settle and timeout when unset and reflects saved values")
+{
+    WebFormSubmission values;
+    values.brokerPort = "1883";
+    values.turnouts[2].settleMs = "750";
+    values.turnouts[2].timeoutMs = "6000";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    REQUIRE(html.find("name='t1_settle' type='number' value='500'") != std::string::npos);
+    REQUIRE(html.find("name='t1_timeout' type='number' value='4000'") != std::string::npos);
+    REQUIRE(html.find("name='t3_settle' type='number' value='750'") != std::string::npos);
+    REQUIRE(html.find("name='t3_timeout' type='number' value='6000'") != std::string::npos);
 }
