@@ -152,6 +152,23 @@ TEST_CASE("render includes a collapsed Advanced Turnout Wiring section")
     REQUIRE(html.find("<summary>Advanced: Turnout Wiring</summary>") != std::string::npos);
 }
 
+TEST_CASE("render warns that saving applies pin assignments to every channel")
+{
+    WebFormSubmission values;
+    values.brokerPort = "1883";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    size_t summaryPos = html.find("<summary>Advanced: Turnout Wiring</summary>");
+    size_t warningPos = html.find(
+        "<p class='warning'>Saving this form applies pin assignments to every "
+        "channel below, including ones you don't change here.</p>");
+
+    REQUIRE(summaryPos != std::string::npos);
+    REQUIRE(warningPos != std::string::npos);
+    REQUIRE(warningPos > summaryPos);
+}
+
 TEST_CASE("render defaults each channel's pin dropdown to its documented GPIO when unset")
 {
     WebFormSubmission values;

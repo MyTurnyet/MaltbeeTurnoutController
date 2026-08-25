@@ -129,6 +129,8 @@ public:
         html += "<label>Broker Port</label><input name='broker_port' type='number' value='"
             + escapeHtml(values.brokerPort) + "'>";
         html += "<details><summary>Advanced: Turnout Wiring</summary>";
+        html += "<p class='warning'>Saving this form applies pin assignments to every "
+            "channel below, including ones you don't change here.</p>";
         for (size_t i = 0; i < values.turnouts.size(); ++i)
         {
             html += renderTurnoutChannel(static_cast<int>(i) + 1, values.turnouts[i]);
@@ -227,5 +229,6 @@ private:
         "details{margin-top:20px;}"
         "summary{cursor:pointer;font-size:0.85rem;font-weight:600;color:#374151;}"
         "fieldset{border:1px solid #e5e7eb;border-radius:8px;margin-top:12px;padding:8px 12px 12px;}"
-        "legend{font-size:0.8rem;font-weight:600;color:#374151;padding:0 4px;}";
+        "legend{font-size:0.8rem;font-weight:600;color:#374151;padding:0 4px;}"
+        ".warning{color:#b45309;font-size:0.8rem;margin:8px 0 0;}";
 };
