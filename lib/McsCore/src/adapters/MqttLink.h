@@ -77,6 +77,21 @@ private:
     {
         client_.connect(clientId_.c_str(), willTopic_.c_str(), 1, true, willMessage_.c_str());
         lastAttempt_ = clock_.now();
+
+        // A connect attempt here may be the very first one (nothing to
+        // resubscribe to yet) or a reconnect after the broker/WiFi dropped
+        // - PubSubClient never remembers subscriptions across a dropped
+        // session, and previous subscribe() calls only sent a SUBSCRIBE
+        // packet if the client happened to already be connected at the
+        // time. Replaying every topic the router knows about on every
+        // successful connect is what actually restores them.
+        if (client_.connected())
+        {
+            for (const std::string& topic : router_.topics())
+            {
+                client_.subscribe(topic.c_str());
+            }
+        }
     }
 
     Clock& clock_;

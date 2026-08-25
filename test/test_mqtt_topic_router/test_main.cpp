@@ -38,3 +38,25 @@ TEST_CASE("dispatch only calls the handler for the matching topic, not others")
     REQUIRE(firstReceived.empty());
     REQUIRE(secondReceived == "world");
 }
+
+TEST_CASE("topics returns every registered topic")
+{
+    MqttTopicRouter router;
+    router.on("topic/one", [](const std::string&) {});
+    router.on("topic/two", [](const std::string&) {});
+
+    std::vector<std::string> topics = router.topics();
+
+    REQUIRE(topics == std::vector<std::string>{"topic/one", "topic/two"});
+}
+
+TEST_CASE("topics does not duplicate a topic registered more than once")
+{
+    MqttTopicRouter router;
+    router.on("topic/one", [](const std::string&) {});
+    router.on("topic/one", [](const std::string&) {});
+
+    std::vector<std::string> topics = router.topics();
+
+    REQUIRE(topics == std::vector<std::string>{"topic/one"});
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <utility>
@@ -24,6 +25,22 @@ public:
                 entry.second(payload);
             }
         }
+    }
+
+    // Every topic ever registered via on(), deduplicated. Lets an adapter
+    // (e.g. MqttLink) replay subscriptions after a reconnect without keeping
+    // its own separate list.
+    std::vector<std::string> topics() const
+    {
+        std::vector<std::string> result;
+        for (const auto& entry : handlers_)
+        {
+            if (std::find(result.begin(), result.end(), entry.first) == result.end())
+            {
+                result.push_back(entry.first);
+            }
+        }
+        return result;
     }
 
 private:
