@@ -50,6 +50,25 @@ same step, on the same page, rather than a new customer-facing capability.
   `pin`/`feedbackPin`/`orientation`/`settleMs`/`timeoutMs` end to end today.
   This design only adds the missing HTML and the missing read-back-for-display
   path.
+- **Revised after whole-branch review (2026-08-26): every Save now
+  commissions all 8 channels, not just touched ones — accepted as intended,
+  not a bug.** The original scope decision above ("every field defaults to a
+  known-good value... rather than defaulting to blank") means a channel's pin
+  dropdown is *always* pre-selected to a real GPIO — the saved value, or the
+  documented default if none is saved yet. A collapsed `<details>` section
+  still submits its contents on Save (collapsing is display-only, not a form
+  participation change), so every submission now includes a real, non-empty
+  pin for all 8 channels — including channels the builder never looked at.
+  `WebFormCommissioningAdapter::buildCommandLines()`'s existing
+  skip-if-empty-pin check therefore never actually skips a channel once this
+  feature ships. **This is now the accepted design**, not preserved from
+  before: Save always commissions all 8 channels to their current saved-or-default
+  values. Consequence: a builder editing a partially-wired board (e.g. fixing
+  a WiFi password) must be aware that Save will also apply documented-default
+  pins to any not-yet-wired channel. `SetupFormRenderer` must render a clear,
+  static warning near the turnout section making this explicit — see
+  "In-page warning" below. Bench-serial commissioning (`turnout <n> pin ...`)
+  is unaffected and still supports touching one channel at a time.
 - **Not changing error handling.** A malformed submission (e.g. a channel
   with a pin selected but feedback left unset) still fails the whole
   submission with a plain-text `ERROR: ...` response, same as an invalid
@@ -107,6 +126,21 @@ status LED pin).
   come from a fixed server-side option list rather than arbitrary user text —
   keeps one consistent escaping discipline across the whole file rather than
   special-casing "safe" fields.
+
+### In-page warning (new, added after whole-branch review)
+
+`render()`'s `<details>` block gains one static warning line, immediately
+after the `<summary>`, before the first channel's fields:
+
+```
+<p class='warning'>Saving this form applies pin assignments to every
+channel below, including ones you don't change here.</p>
+```
+
+Static text, no dynamic content, no `escapeHtml` needed. A small `.warning`
+CSS rule (e.g. amber/orange text, matching the card's existing restrained
+palette) makes it visually distinct from ordinary labels without needing new
+UI machinery.
 
 ### `WebFormCommissioningAdapter` (modified)
 
