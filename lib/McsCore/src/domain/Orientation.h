@@ -30,6 +30,11 @@ public:
         return isThrown ? TurnoutPosition::thrown() : TurnoutPosition::closed();
     }
 
+    bool isInverted() const
+    {
+        return inverted_;
+    }
+
 private:
     explicit Orientation(bool inverted) : inverted_(inverted)
     {

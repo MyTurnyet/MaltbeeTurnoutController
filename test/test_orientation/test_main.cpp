@@ -50,3 +50,9 @@ TEST_CASE("Round-trip through inverted orientation returns the original position
     REQUIRE(orientation.toPosition(orientation.toLevel(TurnoutPosition::closed())) == TurnoutPosition::closed());
     REQUIRE(orientation.toPosition(orientation.toLevel(TurnoutPosition::thrown())) == TurnoutPosition::thrown());
 }
+
+TEST_CASE("isInverted reports whether the orientation is inverted")
+{
+    REQUIRE_FALSE(Orientation::normal().isInverted());
+    REQUIRE(Orientation::inverted().isInverted());
+}
