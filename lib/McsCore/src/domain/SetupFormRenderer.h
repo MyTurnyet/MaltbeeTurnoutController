@@ -3,6 +3,7 @@
 #include <array>
 #include <cctype>
 #include <string>
+#include <vector>
 
 #include "domain/WebFormSubmission.h"
 
@@ -127,6 +128,12 @@ public:
         html += "</div>";
         html += "<label>Broker Port</label><input name='broker_port' type='number' value='"
             + escapeHtml(values.brokerPort) + "'>";
+        html += "<details><summary>Advanced: Turnout Wiring</summary>";
+        for (size_t i = 0; i < values.turnouts.size(); ++i)
+        {
+            html += renderTurnoutChannel(static_cast<int>(i) + 1, values.turnouts[i]);
+        }
+        html += "</details>";
         html += "<button type='submit'>Save</button>";
         html += "</form></div></body></html>";
         return html;
@@ -148,6 +155,59 @@ private:
         return options;
     }
 
+    static std::string renderPinOptions(const std::vector<int>& options, const std::string& selectedValue)
+    {
+        std::string html;
+        html += "<option value=''" + std::string(selectedValue.empty() ? " selected" : "") + ">-- not wired --</option>";
+        for (int pin : options)
+        {
+            std::string value = std::to_string(pin);
+            html += "<option value='" + value + "'" + (value == selectedValue ? " selected" : "") + ">" + value + "</option>";
+        }
+        return html;
+    }
+
+    static std::string renderOrientationOptions(const std::string& selectedOrientation)
+    {
+        std::string effective = selectedOrientation.empty() ? "normal" : selectedOrientation;
+        std::string html;
+        html += "<option value='normal'" + std::string(effective == "normal" ? " selected" : "") + ">normal</option>";
+        html += "<option value='inverted'" + std::string(effective == "inverted" ? " selected" : "") + ">inverted</option>";
+        return html;
+    }
+
+    static std::string renderTurnoutChannel(int channelNumber, const WebFormTurnoutField& field)
+    {
+        int index = channelNumber - 1;
+        std::string defaultPin = std::to_string(kDefaultPin[index]);
+        std::string defaultFeedbackPin = std::to_string(kDefaultFeedbackPin[index]);
+        std::string selectedPin = field.pin.empty() ? defaultPin : field.pin;
+        std::string selectedFeedbackPin = field.feedbackPin.empty() ? defaultFeedbackPin : field.feedbackPin;
+        std::string settleValue = field.settleMs.empty() ? "500" : field.settleMs;
+        std::string timeoutValue = field.timeoutMs.empty() ? "4000" : field.timeoutMs;
+        std::string prefix = "t" + std::to_string(channelNumber) + "_";
+
+        std::string html;
+        html += "<fieldset><legend>Turnout " + std::to_string(channelNumber) + "</legend>";
+        html += "<label>Pin</label><select name='" + prefix + "pin'>"
+            + renderPinOptions(kOutputPinOptions, selectedPin) + "</select>";
+        html += "<label>Feedback Pin</label><select name='" + prefix + "fb'>"
+            + renderPinOptions(kFeedbackPinOptions, selectedFeedbackPin) + "</select>";
+        html += "<label>Orientation</label><select name='" + prefix + "orientation'>"
+            + renderOrientationOptions(field.orientation) + "</select>";
+        html += "<label>Settle (ms)</label><input name='" + prefix + "settle' type='number' value='"
+            + escapeHtml(settleValue) + "'>";
+        html += "<label>Timeout (ms)</label><input name='" + prefix + "timeout' type='number' value='"
+            + escapeHtml(timeoutValue) + "'>";
+        html += "</fieldset>";
+        return html;
+    }
+
+    static inline const std::vector<int> kOutputPinOptions{4, 13, 14, 16, 17, 18, 19, 25, 26, 27, 32, 33};
+    static inline const std::vector<int> kFeedbackPinOptions{4, 13, 14, 16, 17, 18, 19, 25, 26, 27, 32, 33, 34, 35, 36, 39};
+    static inline const std::array<int, 8> kDefaultPin{13, 14, 27, 26, 25, 33, 32, 4};
+    static inline const std::array<int, 8> kDefaultFeedbackPin{36, 39, 34, 35, 16, 17, 18, 19};
+
     static inline const std::string kStyle =
         "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"
         "background:#f2f4f7;margin:0;padding:24px 16px;color:#1f2933;}"
@@ -163,5 +223,9 @@ private:
         ".octets span{color:#9ca3af;}"
         "button{margin-top:24px;width:100%;padding:10px;background:#2563eb;color:#fff;"
         "border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;}"
-        "button:hover{background:#1d4ed8;}";
+        "button:hover{background:#1d4ed8;}"
+        "details{margin-top:20px;}"
+        "summary{cursor:pointer;font-size:0.85rem;font-weight:600;color:#374151;}"
+        "fieldset{border:1px solid #e5e7eb;border-radius:8px;margin-top:12px;padding:8px 12px 12px;}"
+        "legend{font-size:0.8rem;font-weight:600;color:#374151;padding:0 4px;}";
 };
