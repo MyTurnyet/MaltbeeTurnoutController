@@ -21,6 +21,15 @@ public:
 
     void commandTo(TurnoutPosition position, Instant now)
     {
+        // A command matching where we're already settled is a no-op. Without
+        // this, a retained MQTT status echoed back as an incoming command
+        // (status and command share one topic, by design - see TopicScheme)
+        // would restart motion, republish, and be echoed again forever.
+        if (motionState_ == MotionState::AtRest && target_ == position)
+        {
+            return;
+        }
+
         target_ = position;
         motionState_ = MotionState::Moving;
         movementDeadline_.arm(now, movementTimeout_);

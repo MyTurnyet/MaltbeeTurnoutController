@@ -143,6 +143,16 @@ TEST_CASE("A new command while settling interrupts the settle and returns to Mov
     REQUIRE(motion.state() == TurnoutState::Moving);
 }
 
+TEST_CASE("A duplicate command matching the position already at rest is a no-op")
+{
+    TurnoutMotion motion(TurnoutPosition::closed(), Duration(200), Duration(50));
+    motion.update(TurnoutPosition::closed(), Instant(5));
+
+    motion.commandTo(TurnoutPosition::closed(), Instant(10));
+
+    REQUIRE(motion.state() == TurnoutState::Closed);
+}
+
 TEST_CASE("A new command while faulted recovers to Moving toward the new target")
 {
     TurnoutMotion motion(TurnoutPosition::closed(), Duration(200), Duration(50));
