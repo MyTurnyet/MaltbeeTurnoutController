@@ -482,6 +482,26 @@ setup mode — so no new physical input is needed.
 | `ButtonIdentifyRequestTrigger` | Adapter | Same physical pin as `ButtonSetupModeTrigger`, different timing window |
 | `BlinkOutIdentifier` | Domain | Given a `NodeId` and a `Clock`, produces the on/off `Level` sequence for the LED over time. Pure — testable with `ManualClock`, no LED hardware needed. |
 
+### MQTT Activity Indicator
+
+A **three-quick-flash** pattern on the status LED signals "this node just
+received and acted on a turnout command from JMRI" — the lowest-priority use
+of the shared LED, shown only when neither the collision-error pattern nor
+the identify-blink is active (a command received while either of those is
+showing is simply not flashed; there's no queuing). Lets a customer confirm
+at the board, without a laptop, that MQTT commands are actually reaching a
+given node.
+
+| Class | Layer | Responsibility |
+|---|---|---|
+| `FlashBurst` | Domain | Given on/off durations and a flash count, produces a one-shot on/off `Level` sequence that settles dark after the burst — unlike `BlinkOutIdentifier`, it does not pause and repeat. Pure — no `Clock`, no hardware. |
+
+`MqttCommandSource` exposes an edge-triggered `consumeReceived()` (read-and-
+clear), set only when a payload is successfully decoded and dispatched — not
+on malformed payloads or this node's own presence-topic traffic. See
+`docs/superpowers/specs/2026-08-18-mqtt-activity-led-design.md` for the full
+design.
+
 ### Duplicate Node ID Detection
 
 A dropdown makes a duplicate id easier to create by accident than the old

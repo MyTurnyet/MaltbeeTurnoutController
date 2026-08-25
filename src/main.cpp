@@ -18,6 +18,7 @@
 #include "domain/BootMode.h"
 #include "domain/BootModeSelector.h"
 #include "domain/BlinkOutIdentifier.h"
+#include "domain/FlashBurst.h"
 #include "domain/SteadyBlinker.h"
 #include "domain/Deadline.h"
 #include "domain/Level.h"
@@ -54,6 +55,15 @@ constexpr unsigned long kCollisionBlinkHalfPeriodMs = 250;
 // modes). Lets a customer match the AP name in their WiFi list to the
 // physical board - see docs/software-class-list.md's "Entering Setup Mode".
 constexpr unsigned long kSetupModeBlinkHalfPeriodMs = 100;
+
+// Timing for the MQTT turnout-command-received flash burst - three quick
+// flashes, lowest priority on the shared status LED (only shown when
+// neither collision- nor identify-blink is active). See
+// docs/superpowers/specs/2026-08-18-mqtt-activity-led-design.md.
+constexpr unsigned long kMqttFlashOnMs = 80;
+constexpr unsigned long kMqttFlashOffMs = 80;
+constexpr int kMqttFlashCount = 3;
+constexpr unsigned long kMqttFlashBurstTotalMs = (kMqttFlashOnMs + kMqttFlashOffMs) * kMqttFlashCount;
 }
 
 // ControllerNode is constructed here (function-local static, not file-scope)
@@ -76,10 +86,13 @@ static ButtonIdentifyRequestTrigger* identifyTrigger = nullptr;
 static BlinkOutIdentifier* blinkIdentifier = nullptr;
 static SteadyBlinker* collisionBlinker = nullptr;
 static SteadyBlinker* setupModeBlinker = nullptr;
+static FlashBurst* mqttFlashBurst = nullptr;
 static ButtonSetupModeTrigger* runtimeSetupTrigger = nullptr;
 static NvsSetupModeRequestStore* setupRequestStore = nullptr;
 static Deadline identifyDeadline;
 static Instant identifyStart(0);
+static Deadline mqttActivityDeadline;
+static Instant mqttActivityStart(0);
 
 void setup()
 {
@@ -145,17 +158,22 @@ void setup()
             node = &instance;
             node->begin();
 
-            // Field identification (short-press BOOT blinks the node's id)
-            // and the distinct collision-error pattern (steady fast blink,
-            // driven instead whenever ControllerNode::blocked() is true)
-            // share the status LED - only meaningful once a node has an
-            // actual id, so these are only constructed in Normal mode.
+            // Field identification (short-press BOOT blinks the node's id),
+            // the collision-error pattern (steady fast blink, driven
+            // instead whenever ControllerNode::blocked() is true), and the
+            // MQTT turnout-command flash-burst (lowest priority - only
+            // shown when neither of the above is active) share the status
+            // LED - only meaningful once a node has an actual id and is
+            // subscribed to turnout commands, so these are only
+            // constructed in Normal mode.
             static ButtonIdentifyRequestTrigger trigger(bootPin, Duration(kIdentifyMinPressMs), Duration(kIdentifyMaxPressMs));
             identifyTrigger = &trigger;
             static BlinkOutIdentifier identifier(config.id(), Duration(200), Duration(200), Duration(1000));
             blinkIdentifier = &identifier;
             static SteadyBlinker errorBlinker{Duration(kCollisionBlinkHalfPeriodMs)};
             collisionBlinker = &errorBlinker;
+            static FlashBurst flasher(Duration(kMqttFlashOnMs), Duration(kMqttFlashOffMs), kMqttFlashCount);
+            mqttFlashBurst = &flasher;
         }
     }
 }
@@ -195,8 +213,29 @@ void loop()
                 node->republishAllStatus();
             }
 
+            if (node->turnoutCommandReceived())
+            {
+                mqttActivityDeadline.arm(now, Duration(kMqttFlashBurstTotalMs));
+                mqttActivityStart = now;
+            }
+
             bool identifying = identifyDeadline.armed() && !identifyDeadline.expired(now);
-            statusLed->write(identifying ? blinkIdentifier->levelAt(now - identifyStart) : Level::Low);
+            bool flashingMqtt = mqttActivityDeadline.armed() && !mqttActivityDeadline.expired(now);
+
+            Level level;
+            if (identifying)
+            {
+                level = blinkIdentifier->levelAt(now - identifyStart);
+            }
+            else if (flashingMqtt)
+            {
+                level = mqttFlashBurst->levelAt(now - mqttActivityStart);
+            }
+            else
+            {
+                level = Level::Low;
+            }
+            statusLed->write(level);
         }
     }
 

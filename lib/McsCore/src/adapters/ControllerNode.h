@@ -94,6 +94,16 @@ public:
         return blocked_;
     }
 
+
+    // True if a turnout command was successfully decoded and dispatched
+    // since the last call to this method (edge-triggered, read-and-clear).
+    // src/main.cpp calls this once per loop() tick, right after tick(), to
+    // drive the MQTT-activity flash-burst on the status LED.
+    bool turnoutCommandReceived()
+    {
+        return commandSource_.consumeReceived();
+    }
+
 private:
     // GPIO 34/35/36/39 are input-only on the ESP32-WROOM-32 and have no
     // internal pull resistor; every other pin does.

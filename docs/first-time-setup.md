@@ -86,6 +86,7 @@ Once rebooted, the board's status LED tells you what's going on:
 | Off | Normal — running quietly, nothing to report. |
 | Blinks its node number (N short blinks, pause, repeat) | Someone short-pressed BOOT to ask "which board is this?" — see below. |
 | Fast, steady blinking (no pauses) | **Duplicate node ID** — another board on the network already claims this ID. Re-enter setup mode (Step 1) and give this board a different ID. |
+| Three quick flashes | Received a turnout command from JMRI — confirms MQTT commands are reaching this board. |
 
 To confirm a board's identity once it's running normally, **briefly** press
 BOOT (a quick tap, not a hold) — the LED will blink out its node number for
