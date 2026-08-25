@@ -28,24 +28,26 @@
 
 **Interfaces:**
 - Consumes: nothing new.
-- Produces: `bool Orientation::inverted() const` — later used by Task 2 (`WebFormCommissioningAdapter::currentValues()`).
+- Produces: `bool Orientation::isInverted() const` — later used by Task 2 (`WebFormCommissioningAdapter::currentValues()`).
+
+**Naming note:** the accessor is `isInverted()`, not `inverted()` — `Orientation` already has a *static* factory method `static Orientation inverted()`. C++ does not allow a static and a non-static member function to share the same name and parameter list in one class (the compiler rejects it outright, not a style choice), so the new instance accessor needs a different name. `isInverted()` also matches the existing naming convention already used for this exact concept elsewhere in the codebase (`CommissioningSession::isInverted(Orientation)`, a private static helper doing the equivalent check via `toLevel`).
 
 - [ ] **Step 1: Write the failing test**
 
 Append to `test/test_orientation/test_main.cpp`:
 
 ```cpp
-TEST_CASE("inverted reports whether the orientation is inverted")
+TEST_CASE("isInverted reports whether the orientation is inverted")
 {
-    REQUIRE_FALSE(Orientation::normal().inverted());
-    REQUIRE(Orientation::inverted().inverted());
+    REQUIRE_FALSE(Orientation::normal().isInverted());
+    REQUIRE(Orientation::inverted().isInverted());
 }
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pio test -e native -f test_orientation`
-Expected: build error, `class Orientation has no member named 'inverted'`.
+Expected: build error, `class Orientation has no member named 'isInverted'`.
 
 - [ ] **Step 3: Implement**
 
@@ -72,7 +74,7 @@ Change it to:
         return isThrown ? TurnoutPosition::thrown() : TurnoutPosition::closed();
     }
 
-    bool inverted() const
+    bool isInverted() const
     {
         return inverted_;
     }
@@ -104,7 +106,7 @@ Then commit with the composed ACN message.
 - Test: `test/test_web_form_commissioning_adapter/test_main.cpp`
 
 **Interfaces:**
-- Consumes: `Orientation::inverted() const` (Task 1).
+- Consumes: `Orientation::isInverted() const` (Task 1).
 - Produces: `WebFormCommissioningAdapter::currentValues()` now fully populates `form.turnouts[8]` — later consumed by `CaptivePortalServer::handleRoot()` at runtime (already wired, no code change needed there).
 
 **Note:** an uncommissioned channel (`outputPin() == -1`, the factory-default sentinel) must leave **all five** of that channel's fields (`pin`, `feedbackPin`, `orientation`, `settleMs`, `timeoutMs`) as empty strings — not just `pin`/`feedbackPin`. This matters: `TurnoutConfig`'s factory default still carries real `settle=50`/`timeout=200` values alongside the `-1` sentinel pins, and if those leaked through as non-empty, `SetupFormRenderer` (Task 3) would show the old `200`ms timeout footgun instead of its own `500`/`4000` defaults for a never-configured channel. Skipping population entirely for `outputPin() == -1` relies on `WebFormTurnoutField`'s default-constructed `std::string` members already being `""`.
@@ -255,7 +257,7 @@ Change it to:
 
             form.turnouts[i].pin = std::to_string(turnout.outputPin());
             form.turnouts[i].feedbackPin = std::to_string(turnout.feedbackPin());
-            form.turnouts[i].orientation = turnout.orientation().inverted() ? "inverted" : "normal";
+            form.turnouts[i].orientation = turnout.orientation().isInverted() ? "inverted" : "normal";
             form.turnouts[i].settleMs = std::to_string(turnout.settleDuration().milliseconds());
             form.turnouts[i].timeoutMs = std::to_string(turnout.movementTimeout().milliseconds());
         }
