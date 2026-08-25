@@ -58,6 +58,22 @@ public:
         form.wifiPassword = config.wifi().password();
         form.brokerHost = config.broker().host();
         form.brokerPort = std::to_string(config.broker().port());
+
+        for (size_t i = 0; i < form.turnouts.size(); ++i)
+        {
+            const TurnoutConfig& turnout = config.turnouts()[i];
+            if (turnout.outputPin() == -1)
+            {
+                continue;
+            }
+
+            form.turnouts[i].pin = std::to_string(turnout.outputPin());
+            form.turnouts[i].feedbackPin = std::to_string(turnout.feedbackPin());
+            form.turnouts[i].orientation = turnout.orientation().isInverted() ? "inverted" : "normal";
+            form.turnouts[i].settleMs = std::to_string(turnout.settleDuration().milliseconds());
+            form.turnouts[i].timeoutMs = std::to_string(turnout.movementTimeout().milliseconds());
+        }
+
         return form;
     }
 

@@ -167,6 +167,12 @@ TEST_CASE("WebFormCommissioningAdapter currentValues reflects an empty factory-d
     REQUIRE(values.wifiPassword == "");
     REQUIRE(values.brokerHost == "");
     REQUIRE(values.brokerPort == "1883");
+    REQUIRE(values.turnouts[0].pin == "");
+    REQUIRE(values.turnouts[0].feedbackPin == "");
+    REQUIRE(values.turnouts[0].orientation == "");
+    REQUIRE(values.turnouts[0].settleMs == "");
+    REQUIRE(values.turnouts[0].timeoutMs == "");
+    REQUIRE(values.turnouts[7].pin == "");
 }
 
 TEST_CASE("WebFormCommissioningAdapter currentValues reflects a previously saved config")
@@ -197,4 +203,37 @@ TEST_CASE("WebFormCommissioningAdapter currentValues reflects a previously saved
     REQUIRE(values.wifiPassword == "blue caboose 42");
     REQUIRE(values.brokerHost == "192.168.1.50");
     REQUIRE(values.brokerPort == "1883");
+    REQUIRE(values.turnouts[0].pin == "21");
+    REQUIRE(values.turnouts[0].feedbackPin == "31");
+    REQUIRE(values.turnouts[0].orientation == "normal");
+    REQUIRE(values.turnouts[0].settleMs == "50");
+    REQUIRE(values.turnouts[0].timeoutMs == "200");
+    REQUIRE(values.turnouts[7].pin == "28");
+    REQUIRE(values.turnouts[7].feedbackPin == "38");
+}
+
+TEST_CASE("WebFormCommissioningAdapter currentValues reflects a saved inverted orientation")
+{
+    FakeConfigStore store;
+    Duration settle(50);
+    Duration timeout(200);
+    std::array<TurnoutConfig, 8> seedTurnouts{
+        TurnoutConfig(TurnoutId(1), 21, 31, Orientation::inverted(), settle, timeout),
+        TurnoutConfig(TurnoutId(2), 22, 32, Orientation::normal(), settle, timeout),
+        TurnoutConfig(TurnoutId(3), 23, 33, Orientation::normal(), settle, timeout),
+        TurnoutConfig(TurnoutId(4), 24, 34, Orientation::normal(), settle, timeout),
+        TurnoutConfig(TurnoutId(5), 25, 35, Orientation::normal(), settle, timeout),
+        TurnoutConfig(TurnoutId(6), 26, 36, Orientation::normal(), settle, timeout),
+        TurnoutConfig(TurnoutId(7), 27, 37, Orientation::normal(), settle, timeout),
+        TurnoutConfig(TurnoutId(8), 28, 38, Orientation::normal(), settle, timeout)};
+    NodeConfig seed(NodeId(5), WifiCredentials("Layout Room", "blue caboose 42"), BrokerAddress("192.168.1.50", 1883), seedTurnouts);
+    store.save(seed);
+
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+
+    WebFormSubmission values = adapter.currentValues();
+
+    REQUIRE(values.turnouts[0].orientation == "inverted");
+    REQUIRE(values.turnouts[1].orientation == "normal");
 }
