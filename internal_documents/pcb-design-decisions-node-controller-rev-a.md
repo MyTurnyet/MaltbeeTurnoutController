@@ -176,6 +176,8 @@ The alternative — a `HAS_PULLUP` DNP variant per instance — buys nothing and
 
 See project notes §4. Bridges stay disabled until firmware asserts them, so boot doesn't randomly throw turnouts. Solder jumper to 3.3 V as fallback if GPIO 2 misbehaves on this board.
 
+**Caveat added 26 August 2026: not yet validated on real hardware, and firmware doesn't implement it.** Confirmed live that the current breadboard/breakout nodes have nothing wired to GPIO 2 at all — motor bridges are working without any GPIO-driven `STBY` control, so they must be enabled some other way on the actual builds (hardwired high, or an onboard pull-up on the TB6612 breakout modules). Grepping the firmware also turns up zero references to `STBY` or GPIO 23 (the documented status-LED pin) anywhere — the status LED is still hardcoded to GPIO 2 in `src/main.cpp`. Before committing this to fabricated copper, build and test the GPIO-2-as-`STBY`-with-pull-down wiring on the breadboard first, and implement the firmware-side assertion described in project notes §7 ("the composition root must drive GPIO 2 high in `begin()`... leave it low until the object graph is built") — neither has been done yet.
+
 ### Status LED
 
 5 mm red, board-mounted, GPIO 23 through 330 Ω to the anode, cathode to ground. ~4 mA at 3.3 V — clearly visible without being glaring in a dark layout room. Standard `LED_D5.0mm` footprint, 2.54 mm lead spacing, no measurement needed.

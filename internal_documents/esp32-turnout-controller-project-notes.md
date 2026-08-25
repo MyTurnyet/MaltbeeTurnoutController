@@ -1,6 +1,13 @@
 # ESP32 Turnout Controller — Project Notes
 
-Working document. Last updated: 21 August 2026.
+Working document. Last updated: 26 August 2026.
+
+**Rev 3.** Changes in this revision:
+
+- **§3.5 / §6 — feedback contact pin confirmed.** Field-tested on node 2: Tortoise pin 6 (not pin 7) is the correct/reliable feedback contact. Pin 7 produced a live, reproducible fault (see below).
+- **§8 open item 7 (JMRI feedback mode)** — still open, unrelated to this revision's findings.
+- **New open items 16–17** — MQTT resubscribe-after-reconnect bug and status/command self-echo bug, both found and fixed 2026-08-25 (firmware, not wiring). See `docs/task-status.md` for commit references.
+- **New open item 18** — commissioning defaults are a footgun for new-node bring-up (sentinel `-1` pins fail silently; default `movementTimeout` too short for a real Tortoise throw).
 
 **Rev 2 — supersedes `esp32-turnout-controller-notes.md`.** Changes in this revision:
 
@@ -66,6 +73,8 @@ Two hex inverters give 12 channels; 8 used, 4 spare (useful headroom to 12 turno
 Reports *achieved* position rather than *commanded* position. This is a real advantage over DCC accessory decoders, which have no feedback path at all.
 
 Contacts are dry and isolated: **common is pin 5**, to ground. **Pin 6** goes to the GPIO with a pull-up. Pin 7 is the other throw terminal and stays unused — that's the v2.0 two-sensor terminal. No level shifting needed.
+
+**Field-confirmed 26 August 2026: use pin 6, not pin 7.** A node was accidentally wired with pin 7 instead of pin 6 for single-sensor feedback. Symptom was specific and reproducible: the `CLOSED` direction settled and reported correctly every time (that position happens to ground the contact regardless of which pole is wired), but the `THROWN` direction never confirmed — feedback never stabilized, and `TurnoutMotion` correctly timed out to `Unknown` every time. An external pull-up was confirmed present, and an orientation (`normal`/`inverted`) mismatch was ruled out (that would mislabel a stable reading, not cause a timeout), so this isn't a pull-up or firmware config issue — pin 7 on this contact set is simply not a safe drop-in substitute for pin 6 for single-sensor feedback. Moving the wire to pin 6 fixed it immediately. Don't reuse pin 7 for single-sensor feedback on future nodes without re-verifying by continuity test first.
 
 **Two-sensor feedback is out of scope for the first board.** It would need a second GPIO per channel and an extra terminal pole per channel, and it belongs in a second revision if it's wanted at all. The `FeedbackSensor` interface accommodates it later without disturbing the class design.
 
@@ -297,6 +306,9 @@ MQTT never appears in the domain. `MqttPositionReporter` is the only file that k
 | 13 | Panel pushbuttons | Deferred — JMRI-only control chosen for now. Note that MQTT means buttons need the broker up; LCC would allow peer-to-peer operation without JMRI running. |
 | 14 | **Status LED blink patterns** | New. What the LED signals, and whether it gets a `StatusIndicator` domain class with `ManualClock`-testable timing. Doesn't block the board. |
 | 15 | **Mac `mosquitto_pub` "Bad file descriptor"** | New. Unresolved. Doesn't block anything — the Windows side works. |
+| 16 | ~~MQTT subscriptions lost after reconnect~~ | **Closed 2026-08-25 — commit `064337d`.** Board published status fine but never received turnout commands. `MqttLink::subscribe()` only sent SUBSCRIBE if already connected; `WiFi.begin()` being non-blocking meant the first `connect()` attempt almost always lost that race and the subscribe silently dropped, with no retry on later reconnects. Fixed by replaying every known topic on every successful `connect()`. See `docs/task-status.md`. |
+| 17 | ~~MQTT status/command self-echo loop~~ | **Closed 2026-08-25 — commit `2014b21`.** Exposed by fixing #16: since status and command share one topic by design (confirmed live against JMRI), every retained status the board published got redelivered to its own command handler and re-triggered motion, forever. Fixed by making `TurnoutMotion::commandTo()` a no-op when already at rest at the requested position. See `docs/task-status.md`. |
+| 18 | **Commissioning defaults are a footgun for new-node bring-up** | New. A node commissioned only as far as `id`/`wifi`/`broker` (turnout channels left at factory-default `pin=-1`/`fb=-1`) looks fully functional — MQTT, LED, status reporting all work — while silently never driving any turnout at all. Also, the default `movementTimeout` (200 ms) is far too short for a real Tortoise throw (~3 s), so even a correctly-commissioned channel faults to `Unknown` on every real move until `timeout` is explicitly raised (4000 ms confirmed working). Diagnosed via the bench-serial `show` command, not obvious from live symptoms. No task currently owns adding a warning for this; see `docs/task-status.md`'s "Known scaffolding debt." |
 
 ---
 
