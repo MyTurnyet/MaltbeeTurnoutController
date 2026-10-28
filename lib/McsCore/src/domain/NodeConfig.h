@@ -49,7 +49,7 @@ public:
     {
         Orientation orientation = Orientation::normal();
         Duration settle(50);
-        Duration timeout(200);
+        Duration timeout(4000);
 
         std::array<TurnoutConfig, 8> turnouts{
             TurnoutConfig(TurnoutId(1), -1, -1, orientation, settle, timeout),

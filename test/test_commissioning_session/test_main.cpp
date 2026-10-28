@@ -88,7 +88,7 @@ TEST_CASE("apply(Show) reports the draft config")
     REQUIRE(result.response.find("id: 3\n") != std::string::npos);
     REQUIRE(result.response.find("wifi: MySSID\n") != std::string::npos);
     REQUIRE(result.response.find("broker: host:1883\n") != std::string::npos);
-    REQUIRE(result.response.find("turnout 1: pin=-1 fb=-1 orientation=normal settle=50 timeout=200\n") != std::string::npos);
+    REQUIRE(result.response.find("turnout 1: pin=-1 fb=-1 orientation=normal settle=50 timeout=4000\n") != std::string::npos);
 }
 
 TEST_CASE("apply(Save) rejects an invalid draft and does not persist it")
