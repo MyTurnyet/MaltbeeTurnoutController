@@ -23,7 +23,7 @@
 #include "adapters/EspMdnsResolver.h"
 #include "application/BrokerAddressResolver.h"
 #include "adapters/MqttPositionReporter.h"
-#include "adapters/MqttCommandSource.h"
+#include "adapters/Loco2MqttCommandSource.h"
 #include "adapters/MqttNodePresenceReporter.h"
 #include "domain/NodeIdCollisionGuard.h"
 
@@ -67,7 +67,7 @@ public:
         {
             presenceReporter_.announce(config_.id());
             announcedSelf_ = true;
-            commandSource_.subscribeAll(config_.id().value());
+            commandSource_.listen();
         }
     }
 
@@ -75,6 +75,7 @@ public:
     {
         wifiLink_.poll();
         mqttLink_.poll();
+        commandSource_.poll();
         registry_.tick(clock_.now());
     }
 
@@ -205,7 +206,7 @@ private:
                     TurnoutMotion(TurnoutPosition::closed(), config_.turnouts()[7].movementTimeout(), config_.turnouts()[7].settleDuration()),
                     positionReporter_)}};
 
-    MqttCommandSource commandSource_{mqttLink_, registry_};
+    Loco2MqttCommandSource commandSource_{mqttLink_, registry_, config_.id().value(), config_.locoNetAddresses()};
 
     MqttNodePresenceReporter presenceReporter_{mqttLink_};
     NodeIdCollisionGuard collisionGuard_{config_.id()};
