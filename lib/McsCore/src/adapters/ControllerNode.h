@@ -25,8 +25,11 @@
 #include "adapters/Loco2MqttPositionReporter.h"
 #include "domain/PeriodicPositionRepublisher.h"
 #include "adapters/Loco2MqttCommandSource.h"
-#include "adapters/MqttNodePresenceReporter.h"
-#include "domain/NodeIdCollisionGuard.h"
+#include "adapters/NodeIdentityGate.h"
+#include "application/NodePresenceAnnouncer.h"
+#include "domain/GatedCommandSink.h"
+#include "domain/NodeIdentityGuard.h"
+#include "domain/NodePresenceTopics.h"
 
 class ControllerNode
 {
@@ -40,42 +43,17 @@ public:
         wifiLink_.begin(config_.wifi().ssid(), config_.wifi().password());
         mqttLink_.begin(config_.broker().host(), config_.broker().port());
 
-        std::string presenceTopic = "node/" + std::to_string(config_.id().value()) + "/status";
-        mqttLink_.subscribe(presenceTopic, [this](const std::string& payload) {
-            if (payload != "online")
-            {
-                return;
-            }
-
-            if (collisionGuard_.evaluate(config_.id(), announcedSelf_) == PresenceVerdict::Collision)
-            {
-                blocked_ = true;
-            }
+        mqttLink_.subscribe(presenceTopics_.macTopic(), [this](const std::string& mac) {
+            identityGuard_.onMacObserved(mac);
         });
-
-        // Bounded clock-based spin so a pre-existing retained presence
-        // message for our id (from a different node/session already
-        // claiming it) has a chance to arrive before we decide whether to
-        // announce ourselves. Not a blocking delay() - runs once during
-        // begin(), same pattern as src/main.cpp's boot-window detection.
-        Instant start = clock_.now();
-        while (clock_.now() - start < Duration(kPresenceCheckWindowMs))
-        {
-            mqttLink_.poll();
-        }
-
-        if (!blocked_)
-        {
-            presenceReporter_.announce(config_.id());
-            announcedSelf_ = true;
-            commandSource_.listen();
-        }
+        commandSource_.listen();
     }
 
     void tick()
     {
         wifiLink_.poll();
         mqttLink_.poll();
+        announcer_.update(mqttLink_.connected());
         commandSource_.poll();
         republisher_.update(clock_.now(), mqttLink_.connected());
         registry_.tick(clock_.now());
@@ -90,14 +68,13 @@ public:
         registry_.reportAll();
     }
 
-    // True if a different session already claimed this node's id (retained
-    // "online" observed on our own presence topic before we announced
-    // ourselves). While true, turnout commands were never subscribed to -
-    // src/main.cpp drives a distinct error blink pattern instead of the
-    // normal identify blink.
+    // True once another board has been seen announcing this node's id (its
+    // MAC differs from ours on the shared presence topic). Turnout commands
+    // are dropped from then on - src/main.cpp drives a distinct error blink
+    // pattern instead of the normal identify blink.
     bool blocked() const
     {
-        return blocked_;
+        return identityGuard_.collisionDetected();
     }
 
 
@@ -131,7 +108,6 @@ private:
     static constexpr unsigned long kLinkRetryMs = 5000;
     static constexpr unsigned long kBrokerLookupIntervalMs = 60000;
     static constexpr unsigned long kPositionRepublishMs = 30000;
-    static constexpr unsigned long kPresenceCheckWindowMs = 500;
 
     NvsConfigStore configStore_;
     const NodeConfig config_{configStore_.load()};
@@ -160,14 +136,16 @@ private:
     WiFiLink wifiLink_{clock_, kLinkRetryMs};
 
     EspDeviceIdentity deviceIdentity_;
-    EspMdnsResolver mdnsResolver_{"maltbee-turnout-" + deviceIdentity_.mac().lastFourHexDigits()};
+    const std::string macSuffix_{deviceIdentity_.mac().lastFourHexDigits()};
+    const NodePresenceTopics presenceTopics_{"mcs/turnout", config_.id().value()};
+    EspMdnsResolver mdnsResolver_{"maltbee-turnout-" + macSuffix_};
     BrokerAddressResolver brokerAddressResolver_{mdnsResolver_, clock_, kBrokerLookupIntervalMs};
 
     MqttLink mqttLink_{
         clock_,
         kLinkRetryMs,
-        "mcs-node-" + std::to_string(config_.id().value()),
-        "node/" + std::to_string(config_.id().value()) + "/status",
+        "maltbee-turnout-" + macSuffix_,
+        presenceTopics_.statusTopic(),
         "offline",
         brokerAddressResolver_};
 
@@ -211,12 +189,12 @@ private:
 
     PeriodicPositionRepublisher republisher_{registry_, Duration(kPositionRepublishMs)};
 
-    Loco2MqttCommandSource commandSource_{mqttLink_, registry_, config_.id().value(), config_.locoNetAddresses()};
+    NodeIdentityGuard identityGuard_{macSuffix_};
+    NodeIdentityGate identityGate_{identityGuard_};
+    GatedCommandSink gatedSink_{registry_, identityGate_};
+    Loco2MqttCommandSource commandSource_{mqttLink_, gatedSink_, config_.id().value(), config_.locoNetAddresses()};
+    NodePresenceAnnouncer announcer_{mqttLink_, clock_, presenceTopics_, macSuffix_};
 
-    MqttNodePresenceReporter presenceReporter_{mqttLink_};
-    NodeIdCollisionGuard collisionGuard_{config_.id()};
-    bool announcedSelf_ = false;
-    bool blocked_ = false;
 };
 
 #endif
