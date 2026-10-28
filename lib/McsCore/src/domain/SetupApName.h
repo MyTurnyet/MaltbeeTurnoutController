@@ -9,6 +9,6 @@ class SetupApName
 public:
     static std::string from(const MacAddress& mac)
     {
-        return "Tortoise-Setup-" + mac.lastFourHexDigits();
+        return "MTC-Setup-" + mac.lastFourHexDigits();
     }
 };

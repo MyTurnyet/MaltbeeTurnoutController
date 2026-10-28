@@ -42,7 +42,7 @@ normal startup and starts its own WiFi network instead of joining yours.
 Look for a WiFi network named:
 
 ```
-Tortoise-Setup-XXXX
+MTC-Setup-XXXX
 ```
 
 where `XXXX` is 4 characters unique to that board (taken from its hardware
@@ -109,7 +109,7 @@ working.
 
 ## Troubleshooting
 
-- **Don't see `Tortoise-Setup-XXXX` in your WiFi list:** the hold probably
+- **Don't see `MTC-Setup-XXXX` in your WiFi list:** the hold probably
   wasn't caught, or was released too early. Make sure the board is fully
   powered on and running first, then press and hold BOOT for a full 3
   seconds and release it — check again after it reboots.

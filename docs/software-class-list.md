@@ -447,8 +447,8 @@ board has already booted normally — the same reason
 Releasing after a qualifying hold reboots the node, which then skips normal
 startup and instead:
 
-1. Starts its own WiFi access point named `Tortoise-Setup-<last 4 hex digits of MAC>`
-   (e.g. `Tortoise-Setup-3F2A`). The MAC is used here only because the node
+1. Starts its own WiFi access point named `MTC-Setup-<last 4 hex digits of MAC>`
+   (e.g. `MTC-Setup-3F2A`). The MAC is used here only because the node
    has no assigned node id yet — it's never used as identity once
    configured.
 2. Runs a captive portal: connecting a phone/laptop to that AP auto-opens a
