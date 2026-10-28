@@ -237,3 +237,61 @@ TEST_CASE("WebFormCommissioningAdapter currentValues reflects a saved inverted o
     REQUIRE(values.turnouts[0].orientation == "inverted");
     REQUIRE(values.turnouts[1].orientation == "normal");
 }
+
+TEST_CASE("WebFormCommissioningAdapter applies each turnout's LocoNet address")
+{
+    FakeConfigStore store;
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+    WebFormSubmission form = fullyValidSubmission();
+    form.turnouts[0].locoNetAddress = "41";
+    form.turnouts[7].locoNetAddress = "48";
+
+    adapter.submit(form);
+
+    REQUIRE(store.saved()->locoNetAddresses()[0] == 41);
+    REQUIRE(store.saved()->locoNetAddresses()[7] == 48);
+    REQUIRE(store.saved()->locoNetAddresses()[3] == 0);
+}
+
+TEST_CASE("WebFormCommissioningAdapter clears a LocoNet address when its field is blank")
+{
+    FakeConfigStore store;
+    store.save(NodeConfig::factoryDefault().withLocoNetAddress(0, 41));
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+    WebFormSubmission form = fullyValidSubmission();
+    form.turnouts[0].locoNetAddress = "";
+
+    adapter.submit(form);
+
+    REQUIRE(store.saved()->locoNetAddresses()[0] == 0);
+}
+
+TEST_CASE("WebFormCommissioningAdapter reports a duplicate LocoNet address and does not save")
+{
+    FakeConfigStore store;
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+    WebFormSubmission form = fullyValidSubmission();
+    form.turnouts[0].locoNetAddress = "9";
+    form.turnouts[1].locoNetAddress = "9";
+
+    std::string response = adapter.submit(form);
+
+    REQUIRE(response.rfind("ERROR", 0) == 0);
+    REQUIRE_FALSE(store.saved().has_value());
+}
+
+TEST_CASE("WebFormCommissioningAdapter currentValues shows saved LocoNet addresses, blank when unconfigured")
+{
+    FakeConfigStore store;
+    store.save(NodeConfig::factoryDefault().withLocoNetAddress(2, 41));
+    CommissioningSession session(store);
+    WebFormCommissioningAdapter adapter(session);
+
+    WebFormSubmission values = adapter.currentValues();
+
+    REQUIRE(values.turnouts[2].locoNetAddress == "41");
+    REQUIRE(values.turnouts[0].locoNetAddress == "");
+}

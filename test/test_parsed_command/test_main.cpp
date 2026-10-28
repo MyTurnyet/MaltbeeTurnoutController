@@ -66,3 +66,12 @@ TEST_CASE("ParsedCommand::turnoutConfig throws when called on a non-SetTurnout c
 
     REQUIRE_THROWS_AS(command.turnoutConfig(), std::bad_optional_access);
 }
+
+TEST_CASE("ParsedCommand::setLocoNetAddress carries the turnout index and address")
+{
+    ParsedCommand command = ParsedCommand::setLocoNetAddress(2, 41);
+
+    REQUIRE(command.type() == CommandType::SetLocoNetAddress);
+    REQUIRE(command.turnoutIndex() == 2);
+    REQUIRE(command.locoNetAddress() == 41);
+}

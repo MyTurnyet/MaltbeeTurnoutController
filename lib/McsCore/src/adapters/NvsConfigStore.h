@@ -38,6 +38,7 @@ public:
             std::string prefix = "t" + std::to_string(i);
             prefs.putInt((prefix + "op").c_str(), turnout.outputPin());
             prefs.putInt((prefix + "fp").c_str(), turnout.feedbackPin());
+            prefs.putInt((prefix + "ad").c_str(), config.locoNetAddresses()[i]);
             prefs.putBool((prefix + "iv").c_str(), isInverted(turnout.orientation()));
             prefs.putULong((prefix + "se").c_str(), turnout.settleDuration().milliseconds());
             prefs.putULong((prefix + "mt").c_str(), turnout.movementTimeout().milliseconds());
@@ -78,6 +79,7 @@ public:
                 inverted ? Orientation::inverted() : Orientation::normal(),
                 Duration(settle),
                 Duration(timeout)));
+            config = config.withLocoNetAddress(i, prefs.getInt((prefix + "ad").c_str(), config.locoNetAddresses()[i]));
         }
 
         prefs.end();

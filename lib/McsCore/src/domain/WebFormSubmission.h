@@ -10,6 +10,7 @@ struct WebFormTurnoutField
     std::string orientation;
     std::string settleMs;
     std::string timeoutMs;
+    std::string locoNetAddress;
 };
 
 struct WebFormSubmission

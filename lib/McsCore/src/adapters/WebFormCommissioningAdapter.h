@@ -62,6 +62,10 @@ public:
         for (size_t i = 0; i < form.turnouts.size(); ++i)
         {
             const TurnoutConfig& turnout = config.turnouts()[i];
+            if (config.locoNetAddresses()[i] != 0)
+            {
+                form.turnouts[i].locoNetAddress = std::to_string(config.locoNetAddresses()[i]);
+            }
             if (turnout.outputPin() == -1)
             {
                 continue;
@@ -104,6 +108,12 @@ private:
                 + " orientation " + field.orientation
                 + " settle " + field.settleMs
                 + " timeout " + field.timeoutMs);
+        }
+
+        for (size_t i = 0; i < form.turnouts.size(); ++i)
+        {
+            const std::string& address = form.turnouts[i].locoNetAddress;
+            lines.push_back("address " + std::to_string(i + 1) + " " + (address.empty() ? "0" : address));
         }
 
         return lines;

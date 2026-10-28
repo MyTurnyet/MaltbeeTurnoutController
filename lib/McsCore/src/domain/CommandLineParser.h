@@ -42,6 +42,10 @@ public:
         {
             return parseSetTurnout(tokens);
         }
+        if (keyword == "address" && tokens.size() == 3)
+        {
+            return parseSetLocoNetAddress(tokens);
+        }
         if (keyword == "show" && tokens.size() == 1)
         {
             return ParsedCommand::show();
@@ -136,6 +140,22 @@ private:
             return ParsedCommand::invalid("broker: expected an integer port");
         }
         return ParsedCommand::setBroker(tokens[1], port);
+    }
+
+    static ParsedCommand parseSetLocoNetAddress(const std::vector<std::string>& tokens)
+    {
+        // address <n> <locoNetAddress>
+        int n;
+        int address;
+        if (!parseInt(tokens[1], n) || !parseInt(tokens[2], address))
+        {
+            return ParsedCommand::invalid("address: expected integers for n/address");
+        }
+        if (n < 1 || n > 8)
+        {
+            return ParsedCommand::invalid("address: n must be 1-8");
+        }
+        return ParsedCommand::setLocoNetAddress(n - 1, address);
     }
 
     static ParsedCommand parseSetTurnout(const std::vector<std::string>& tokens)

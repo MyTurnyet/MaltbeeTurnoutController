@@ -53,6 +53,10 @@ public:
             draft_ = draft_.withTurnout(command.turnoutIndex(), command.turnoutConfig());
             return {"OK", false};
 
+        case CommandType::SetLocoNetAddress:
+            draft_ = draft_.withLocoNetAddress(command.turnoutIndex(), command.locoNetAddress());
+            return {"OK", false};
+
         case CommandType::Show:
             return {formatShow(), false};
 
@@ -109,7 +113,19 @@ private:
                 + "\n";
         }
 
+        for (int i = 0; i < 8; ++i)
+        {
+            text += formatAddressLine(i);
+        }
+
         return text;
+    }
+
+    std::string formatAddressLine(int index) const
+    {
+        const int address = draft_.locoNetAddresses()[index];
+        return "address " + std::to_string(index + 1) + ": "
+            + (address == 0 ? std::string("(unconfigured)") : std::to_string(address)) + "\n";
     }
 
     static bool isInverted(Orientation orientation)

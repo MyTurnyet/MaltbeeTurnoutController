@@ -12,6 +12,7 @@ enum class CommandType
     SetWifi,
     SetBroker,
     SetTurnout,
+    SetLocoNetAddress,
     Show,
     Save,
     Reboot,
@@ -49,6 +50,14 @@ public:
         ParsedCommand command(CommandType::SetTurnout);
         command.turnoutIndex_ = index;
         command.turnoutConfig_ = std::move(config);
+        return command;
+    }
+
+    static ParsedCommand setLocoNetAddress(int index, int address)
+    {
+        ParsedCommand command(CommandType::SetLocoNetAddress);
+        command.turnoutIndex_ = index;
+        command.locoNetAddress_ = address;
         return command;
     }
 
@@ -109,6 +118,11 @@ public:
         return turnoutIndex_;
     }
 
+    int locoNetAddress() const
+    {
+        return locoNetAddress_;
+    }
+
     const TurnoutConfig& turnoutConfig() const
     {
         return turnoutConfig_.value();
@@ -131,6 +145,7 @@ private:
     std::string brokerHost_;
     int brokerPort_ = 0;
     int turnoutIndex_ = 0;
+    int locoNetAddress_ = 0;
     std::optional<TurnoutConfig> turnoutConfig_;
     std::string invalidReason_;
 };

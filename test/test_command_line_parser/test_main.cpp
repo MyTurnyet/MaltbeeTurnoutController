@@ -146,3 +146,38 @@ TEST_CASE("unquoted commands still tokenize exactly as before")
     REQUIRE(command.type() == CommandType::SetTurnout);
     REQUIRE(command.turnoutIndex() == 0);
 }
+
+TEST_CASE("parses address command")
+{
+    ParsedCommand command = CommandLineParser::parse("address 3 41");
+
+    REQUIRE(command.type() == CommandType::SetLocoNetAddress);
+    REQUIRE(command.turnoutIndex() == 2);
+    REQUIRE(command.locoNetAddress() == 41);
+}
+
+TEST_CASE("parses address command that clears an address")
+{
+    ParsedCommand command = CommandLineParser::parse("address 1 0");
+
+    REQUIRE(command.type() == CommandType::SetLocoNetAddress);
+    REQUIRE(command.locoNetAddress() == 0);
+}
+
+TEST_CASE("rejects address with a turnout number outside 1-8")
+{
+    REQUIRE(CommandLineParser::parse("address 0 5").type() == CommandType::Invalid);
+    REQUIRE(CommandLineParser::parse("address 9 5").type() == CommandType::Invalid);
+}
+
+TEST_CASE("rejects address with non-numeric arguments")
+{
+    REQUIRE(CommandLineParser::parse("address one 5").type() == CommandType::Invalid);
+    REQUIRE(CommandLineParser::parse("address 1 five").type() == CommandType::Invalid);
+}
+
+TEST_CASE("rejects address with the wrong number of arguments")
+{
+    REQUIRE(CommandLineParser::parse("address 1").type() == CommandType::Invalid);
+    REQUIRE(CommandLineParser::parse("address 1 5 6").type() == CommandType::Invalid);
+}

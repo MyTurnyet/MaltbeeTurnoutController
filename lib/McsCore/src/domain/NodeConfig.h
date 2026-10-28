@@ -32,8 +32,16 @@ struct ConfigError
 class NodeConfig
 {
 public:
-    NodeConfig(NodeId id, WifiCredentials wifi, BrokerAddress broker, std::array<TurnoutConfig, 8> turnouts)
-        : id_(id), wifi_(std::move(wifi)), broker_(std::move(broker)), turnouts_(std::move(turnouts))
+    static constexpr int kMinLocoNetAddress = 1;
+    static constexpr int kMaxLocoNetAddress = 2048;
+
+    NodeConfig(NodeId id, WifiCredentials wifi, BrokerAddress broker, std::array<TurnoutConfig, 8> turnouts,
+               std::array<int, 8> locoNetAddresses = {})
+        : id_(id),
+          wifi_(std::move(wifi)),
+          broker_(std::move(broker)),
+          turnouts_(std::move(turnouts)),
+          locoNetAddresses_(locoNetAddresses)
     {
     }
 
@@ -79,24 +87,37 @@ public:
 
     NodeConfig withId(NodeId id) const
     {
-        return NodeConfig(id, wifi_, broker_, turnouts_);
+        return NodeConfig(id, wifi_, broker_, turnouts_, locoNetAddresses_);
     }
 
     NodeConfig withWifi(WifiCredentials wifi) const
     {
-        return NodeConfig(id_, std::move(wifi), broker_, turnouts_);
+        return NodeConfig(id_, std::move(wifi), broker_, turnouts_, locoNetAddresses_);
     }
 
     NodeConfig withBroker(BrokerAddress broker) const
     {
-        return NodeConfig(id_, wifi_, std::move(broker), turnouts_);
+        return NodeConfig(id_, wifi_, std::move(broker), turnouts_, locoNetAddresses_);
     }
 
     NodeConfig withTurnout(int index, TurnoutConfig turnout) const
     {
         std::array<TurnoutConfig, 8> updated = turnouts_;
         updated[index] = turnout;
-        return NodeConfig(id_, wifi_, broker_, updated);
+        return NodeConfig(id_, wifi_, broker_, updated, locoNetAddresses_);
+    }
+
+    // LocoNet turnout address for each channel; 0 means unconfigured.
+    const std::array<int, 8>& locoNetAddresses() const
+    {
+        return locoNetAddresses_;
+    }
+
+    NodeConfig withLocoNetAddress(int index, int address) const
+    {
+        std::array<int, 8> updated = locoNetAddresses_;
+        updated[index] = address;
+        return NodeConfig(id_, wifi_, broker_, turnouts_, updated);
     }
 
     std::vector<ConfigError> validate() const
@@ -127,12 +148,14 @@ public:
             }
         }
 
+        appendLocoNetAddressErrors(errors);
         return errors;
     }
 
     bool operator==(const NodeConfig& other) const
     {
-        return id_ == other.id_ && wifi_ == other.wifi_ && broker_ == other.broker_ && turnouts_ == other.turnouts_;
+        return id_ == other.id_ && wifi_ == other.wifi_ && broker_ == other.broker_ && turnouts_ == other.turnouts_
+            && locoNetAddresses_ == other.locoNetAddresses_;
     }
 
     bool operator!=(const NodeConfig& other) const
@@ -141,8 +164,46 @@ public:
     }
 
 private:
+    void appendLocoNetAddressErrors(std::vector<ConfigError>& errors) const
+    {
+        for (int index = 0; index < 8; ++index)
+        {
+            appendLocoNetAddressErrorsFor(index, errors);
+        }
+    }
+
+    void appendLocoNetAddressErrorsFor(int index, std::vector<ConfigError>& errors) const
+    {
+        const int address = locoNetAddresses_[index];
+        if (address == 0)
+        {
+            return;
+        }
+        if (address < kMinLocoNetAddress || address > kMaxLocoNetAddress)
+        {
+            errors.push_back(ConfigError{"Turnout " + std::to_string(index + 1) +
+                                         " LocoNet address out of range (must be 0 or 1-2048)"});
+            return;
+        }
+        appendDuplicateLocoNetAddressErrors(index, errors);
+    }
+
+    void appendDuplicateLocoNetAddressErrors(int index, std::vector<ConfigError>& errors) const
+    {
+        for (int other = index + 1; other < 8; ++other)
+        {
+            if (locoNetAddresses_[other] == locoNetAddresses_[index])
+            {
+                errors.push_back(ConfigError{"LocoNet address " + std::to_string(locoNetAddresses_[index]) +
+                                             " used by turnouts " + std::to_string(index + 1) + " and " +
+                                             std::to_string(other + 1)});
+            }
+        }
+    }
+
     NodeId id_;
     WifiCredentials wifi_;
     BrokerAddress broker_;
     std::array<TurnoutConfig, 8> turnouts_;
+    std::array<int, 8> locoNetAddresses_;
 };

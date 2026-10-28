@@ -78,6 +78,7 @@ private:
             form.turnouts[i].orientation = webServer_.arg((prefix + "orientation").c_str()).c_str();
             form.turnouts[i].settleMs = webServer_.arg((prefix + "settle").c_str()).c_str();
             form.turnouts[i].timeoutMs = webServer_.arg((prefix + "timeout").c_str()).c_str();
+            form.turnouts[i].locoNetAddress = webServer_.arg((prefix + "addr").c_str()).c_str();
         }
 
         return form;

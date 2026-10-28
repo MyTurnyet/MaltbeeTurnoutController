@@ -201,6 +201,8 @@ private:
             + escapeHtml(settleValue) + "'>";
         html += "<label>Timeout (ms)</label><input name='" + prefix + "timeout' type='number' value='"
             + escapeHtml(timeoutValue) + "'>";
+        html += "<label>LocoNet Address</label><input name='" + prefix + "addr' type='number' min='0' max='2048' value='"
+            + escapeHtml(field.locoNetAddress) + "'>";
         html += "</fieldset>";
         return html;
     }

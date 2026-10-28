@@ -230,3 +230,24 @@ TEST_CASE("render defaults settle and timeout when unset and reflects saved valu
     REQUIRE(html.find("name='t3_settle' type='number' value='750'") != std::string::npos);
     REQUIRE(html.find("name='t3_timeout' type='number' value='6000'") != std::string::npos);
 }
+
+TEST_CASE("render includes a LocoNet address input for every channel")
+{
+    std::string html = SetupFormRenderer::render(WebFormSubmission{});
+
+    for (int channel = 1; channel <= 8; ++channel)
+    {
+        REQUIRE(html.find("name='t" + std::to_string(channel) + "_addr' type='number'") != std::string::npos);
+    }
+}
+
+TEST_CASE("render pre-fills a saved LocoNet address and leaves unconfigured ones blank")
+{
+    WebFormSubmission values;
+    values.turnouts[1].locoNetAddress = "41";
+
+    std::string html = SetupFormRenderer::render(values);
+
+    REQUIRE(html.find("name='t2_addr' type='number' min='0' max='2048' value='41'") != std::string::npos);
+    REQUIRE(html.find("name='t1_addr' type='number' min='0' max='2048' value=''") != std::string::npos);
+}

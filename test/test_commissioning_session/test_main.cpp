@@ -141,3 +141,37 @@ TEST_CASE("apply(Invalid) reports the parser's reason")
     REQUIRE(result.response == "ERROR: bad input");
     REQUIRE_FALSE(result.rebootRequested);
 }
+
+TEST_CASE("apply(SetLocoNetAddress) updates the draft address for that turnout")
+{
+    FakeConfigStore store;
+    CommissioningSession session(store);
+
+    CommissioningResult result = session.apply(ParsedCommand::setLocoNetAddress(2, 41));
+
+    REQUIRE(result.response == "OK");
+    REQUIRE(session.draft().locoNetAddresses()[2] == 41);
+}
+
+TEST_CASE("apply(SetTurnout) keeps the turnout's LocoNet address")
+{
+    FakeConfigStore store;
+    CommissioningSession session(store);
+    session.apply(ParsedCommand::setLocoNetAddress(0, 41));
+
+    session.apply(ParsedCommand::setTurnout(0, makeTurnoutConfig(1, 13, 36)));
+
+    REQUIRE(session.draft().locoNetAddresses()[0] == 41);
+}
+
+TEST_CASE("apply(Show) reports each turnout's LocoNet address, or that it is unconfigured")
+{
+    FakeConfigStore store;
+    CommissioningSession session(store);
+    session.apply(ParsedCommand::setLocoNetAddress(1, 41));
+
+    CommissioningResult result = session.apply(ParsedCommand::show());
+
+    REQUIRE(result.response.find("address 1: (unconfigured)\n") != std::string::npos);
+    REQUIRE(result.response.find("address 2: 41\n") != std::string::npos);
+}

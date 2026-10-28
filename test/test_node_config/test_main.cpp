@@ -161,3 +161,84 @@ TEST_CASE("NodeConfigs differing only by id are not equal")
 
     REQUIRE(a != b);
 }
+
+namespace
+{
+NodeConfig validConfig()
+{
+    return NodeConfig(NodeId(3), WifiCredentials("ssid", "pw"), BrokerAddress("host", 1883), validTurnouts());
+}
+}
+
+TEST_CASE("LocoNet addresses default to unconfigured (0) for every turnout")
+{
+    NodeConfig config = validConfig();
+
+    for (int address : config.locoNetAddresses())
+    {
+        REQUIRE(address == 0);
+    }
+}
+
+TEST_CASE("withLocoNetAddress returns a new config with only that turnout's address changed")
+{
+    NodeConfig config = validConfig();
+
+    NodeConfig updated = config.withLocoNetAddress(2, 41);
+
+    REQUIRE(updated.locoNetAddresses()[2] == 41);
+    REQUIRE(updated.locoNetAddresses()[1] == 0);
+    REQUIRE(config.locoNetAddresses()[2] == 0);
+    REQUIRE(updated.id() == config.id());
+}
+
+TEST_CASE("the other with-methods keep the LocoNet addresses")
+{
+    NodeConfig config = validConfig().withLocoNetAddress(0, 7);
+
+    REQUIRE(config.withId(NodeId(4)).locoNetAddresses()[0] == 7);
+    REQUIRE(config.withWifi(WifiCredentials("a", "b")).locoNetAddresses()[0] == 7);
+    REQUIRE(config.withBroker(BrokerAddress("h", 1)).locoNetAddresses()[0] == 7);
+    REQUIRE(config.withTurnout(1, makeTurnoutConfig(2, 110, 210)).locoNetAddresses()[0] == 7);
+}
+
+TEST_CASE("configs differing only in a LocoNet address are not equal")
+{
+    REQUIRE(validConfig() != validConfig().withLocoNetAddress(0, 5));
+}
+
+TEST_CASE("validate accepts unconfigured and in-range LocoNet addresses")
+{
+    NodeConfig config = validConfig().withLocoNetAddress(0, 1).withLocoNetAddress(1, 2048);
+
+    REQUIRE(config.validate().empty());
+}
+
+TEST_CASE("validate rejects a LocoNet address above 2048")
+{
+    std::vector<ConfigError> errors = validConfig().withLocoNetAddress(0, 2049).validate();
+
+    REQUIRE(errors.size() == 1);
+    REQUIRE(errors[0].message == "Turnout 1 LocoNet address out of range (must be 0 or 1-2048)");
+}
+
+TEST_CASE("validate rejects a negative LocoNet address")
+{
+    std::vector<ConfigError> errors = validConfig().withLocoNetAddress(3, -1).validate();
+
+    REQUIRE(errors.size() == 1);
+    REQUIRE(errors[0].message == "Turnout 4 LocoNet address out of range (must be 0 or 1-2048)");
+}
+
+TEST_CASE("validate rejects two turnouts sharing a LocoNet address")
+{
+    std::vector<ConfigError> errors = validConfig().withLocoNetAddress(0, 9).withLocoNetAddress(5, 9).validate();
+
+    REQUIRE(errors.size() == 1);
+    REQUIRE(errors[0].message == "LocoNet address 9 used by turnouts 1 and 6");
+}
+
+TEST_CASE("validate allows many turnouts to be unconfigured at once")
+{
+    REQUIRE(validConfig().withLocoNetAddress(0, 9).validate().empty());
+}
