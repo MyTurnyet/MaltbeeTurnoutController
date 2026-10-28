@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-#include "adapters/MqttLink.h"
+#include "ports/MqttTransport.h"
 #include "domain/TopicScheme.h"
 #include "domain/PayloadCodec.h"
 #include "domain/TurnoutId.h"
@@ -16,8 +16,8 @@
 class MqttCommandSource
 {
 public:
-    MqttCommandSource(MqttLink& link, TurnoutCommandSink& sink)
-        : link_(link), sink_(sink)
+    MqttCommandSource(MqttTransport& transport, TurnoutCommandSink& sink)
+        : transport_(transport), sink_(sink)
     {
     }
 
@@ -27,7 +27,7 @@ public:
         {
             TurnoutId id(nodeId * 100 + channel);
             std::string topic = TopicScheme::topicFor(id);
-            link_.subscribe(topic, [this, id](const std::string& payload) {
+            transport_.subscribe(topic, [this, id](const std::string& payload) {
                 handle(id, payload);
             });
         }
@@ -56,7 +56,7 @@ private:
         receivedThisTick_ = true;
     }
 
-    MqttLink& link_;
+    MqttTransport& transport_;
     TurnoutCommandSink& sink_;
     bool receivedThisTick_ = false;
 };

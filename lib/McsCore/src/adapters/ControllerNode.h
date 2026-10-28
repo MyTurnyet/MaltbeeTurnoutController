@@ -19,6 +19,9 @@
 #include "adapters/NvsConfigStore.h"
 #include "adapters/WiFiLink.h"
 #include "adapters/MqttLink.h"
+#include "adapters/EspDeviceIdentity.h"
+#include "adapters/EspMdnsResolver.h"
+#include "application/BrokerAddressResolver.h"
 #include "adapters/MqttPositionReporter.h"
 #include "adapters/MqttCommandSource.h"
 #include "adapters/MqttNodePresenceReporter.h"
@@ -33,8 +36,8 @@ public:
 
     void begin()
     {
-        wifiLink_.begin(config_.wifi());
-        mqttLink_.begin(config_.broker());
+        wifiLink_.begin(config_.wifi().ssid(), config_.wifi().password());
+        mqttLink_.begin(config_.broker().host(), config_.broker().port());
 
         std::string presenceTopic = "node/" + std::to_string(config_.id().value()) + "/status";
         mqttLink_.subscribe(presenceTopic, [this](const std::string& payload) {
@@ -123,6 +126,7 @@ private:
     // the motion state machine ever sees a position.
     static constexpr unsigned long kFeedbackDebounceMs = 20;
     static constexpr unsigned long kLinkRetryMs = 5000;
+    static constexpr unsigned long kBrokerLookupIntervalMs = 60000;
     static constexpr unsigned long kPresenceCheckWindowMs = 500;
 
     NvsConfigStore configStore_;
@@ -149,14 +153,19 @@ private:
         EspDigitalInput(config_.turnouts()[6].feedbackPin(), hasInternalPullUp(config_.turnouts()[6].feedbackPin())),
         EspDigitalInput(config_.turnouts()[7].feedbackPin(), hasInternalPullUp(config_.turnouts()[7].feedbackPin()))};
 
-    WiFiLink wifiLink_{clock_, Duration(kLinkRetryMs)};
+    WiFiLink wifiLink_{clock_, kLinkRetryMs};
+
+    EspDeviceIdentity deviceIdentity_;
+    EspMdnsResolver mdnsResolver_{"maltbee-turnout-" + deviceIdentity_.mac().lastFourHexDigits()};
+    BrokerAddressResolver brokerAddressResolver_{mdnsResolver_, clock_, kBrokerLookupIntervalMs};
 
     MqttLink mqttLink_{
         clock_,
-        Duration(kLinkRetryMs),
+        kLinkRetryMs,
         "mcs-node-" + std::to_string(config_.id().value()),
         "node/" + std::to_string(config_.id().value()) + "/status",
-        "offline"};
+        "offline",
+        brokerAddressResolver_};
 
     MqttPositionReporter positionReporter_{mqttLink_};
 

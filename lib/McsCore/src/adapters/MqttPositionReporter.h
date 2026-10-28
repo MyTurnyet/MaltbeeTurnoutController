@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "adapters/MqttLink.h"
+#include "ports/MqttTransport.h"
 #include "ports/PositionReporter.h"
 #include "domain/TopicScheme.h"
 #include "domain/PayloadCodec.h"
@@ -14,7 +14,7 @@
 class MqttPositionReporter : public PositionReporter
 {
 public:
-    explicit MqttPositionReporter(MqttLink& link) : link_(link)
+    explicit MqttPositionReporter(MqttTransport& transport) : transport_(transport)
     {
     }
 
@@ -22,11 +22,11 @@ public:
     {
         std::string topic = TopicScheme::topicFor(id);
         std::string payload = PayloadCodec::encode(state);
-        link_.raw().publish(topic.c_str(), payload.c_str(), true);
+        transport_.publish(topic, payload, true);
     }
 
 private:
-    MqttLink& link_;
+    MqttTransport& transport_;
 };
 
 #endif
