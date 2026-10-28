@@ -8,9 +8,10 @@
 #include "domain/TurnoutId.h"
 #include "domain/TurnoutPosition.h"
 #include "domain/Instant.h"
+#include "ports/PositionBroadcaster.h"
 #include "ports/TurnoutCommandSink.h"
 
-class TurnoutRegistry : public TurnoutCommandSink
+class TurnoutRegistry : public TurnoutCommandSink, public PositionBroadcaster
 {
 public:
     static constexpr int TurnoutsPerNode = 8;
@@ -56,7 +57,7 @@ public:
         }
     }
 
-    void reportAll()
+    void reportAll() override
     {
         for (auto& turnout : turnouts_)
         {

@@ -22,7 +22,8 @@
 #include "adapters/EspDeviceIdentity.h"
 #include "adapters/EspMdnsResolver.h"
 #include "application/BrokerAddressResolver.h"
-#include "adapters/MqttPositionReporter.h"
+#include "adapters/Loco2MqttPositionReporter.h"
+#include "domain/PeriodicPositionRepublisher.h"
 #include "adapters/Loco2MqttCommandSource.h"
 #include "adapters/MqttNodePresenceReporter.h"
 #include "domain/NodeIdCollisionGuard.h"
@@ -76,6 +77,7 @@ public:
         wifiLink_.poll();
         mqttLink_.poll();
         commandSource_.poll();
+        republisher_.update(clock_.now(), mqttLink_.connected());
         registry_.tick(clock_.now());
     }
 
@@ -128,6 +130,7 @@ private:
     static constexpr unsigned long kFeedbackDebounceMs = 20;
     static constexpr unsigned long kLinkRetryMs = 5000;
     static constexpr unsigned long kBrokerLookupIntervalMs = 60000;
+    static constexpr unsigned long kPositionRepublishMs = 30000;
     static constexpr unsigned long kPresenceCheckWindowMs = 500;
 
     NvsConfigStore configStore_;
@@ -168,7 +171,7 @@ private:
         "offline",
         brokerAddressResolver_};
 
-    MqttPositionReporter positionReporter_{mqttLink_};
+    Loco2MqttPositionReporter positionReporter_{mqttLink_, config_.id().value(), config_.locoNetAddresses()};
 
     TurnoutRegistry registry_{
         config_.id().value(),
@@ -205,6 +208,8 @@ private:
                     FeedbackSensor(inputs_[7], config_.turnouts()[7].orientation(), Duration(kFeedbackDebounceMs)),
                     TurnoutMotion(TurnoutPosition::closed(), config_.turnouts()[7].movementTimeout(), config_.turnouts()[7].settleDuration()),
                     positionReporter_)}};
+
+    PeriodicPositionRepublisher republisher_{registry_, Duration(kPositionRepublishMs)};
 
     Loco2MqttCommandSource commandSource_{mqttLink_, registry_, config_.id().value(), config_.locoNetAddresses()};
 
