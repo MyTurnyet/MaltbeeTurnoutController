@@ -8,7 +8,7 @@ Always use the `/arlo-commits` skill when committing changes in this repository 
 
 ## Project Purpose
 
-Maltbee Turnout Controller — ESP32-WROOM-32 firmware that drives up to 8 Tortoise slow-motion switch machines per board, commanded via JMRI over MQTT. Domain/application design (Tortoise driver behavior, MQTT/JMRI adapters, turnout state model) is being developed separately and brought into this repo incrementally. See `docs/software-class-list.md` for the concrete value objects/ports/domain/adapter class breakdown (source of truth, synced from the design doc), and `docs/superpowers/specs/` / `docs/superpowers/plans/` for design and implementation history.
+Maltbee Turnout Controller — ESP32-WROOM-32 firmware that drives up to 8 Tortoise slow-motion switch machines per board, driven over MQTT by a Loco2MQTT device (the LocoNet-to-MQTT bridge that JMRI talks to). Domain/application design (Tortoise driver behavior, MQTT/JMRI adapters, turnout state model) is being developed separately and brought into this repo incrementally. See `docs/software-class-list.md` for the concrete value objects/ports/domain/adapter class breakdown (source of truth, synced from the design doc), and `docs/superpowers/specs/` / `docs/superpowers/plans/` for design and implementation history.
 
 ## Commands
 
@@ -35,8 +35,17 @@ Hexagonal architecture, same discipline as the MaltbeeController project this wa
 - **Ports** (`lib/McsCore/src/ports/`) are pure interfaces the domain/application depend on.
 - **Adapters** (`lib/McsCore/src/adapters/`) implement ports against real ESP32 hardware, guarded with `#ifdef ARDUINO` so they don't break the native build. Hand-written test doubles (`test/support/`) implement the same ports for native unit tests — no mocking framework.
 - **`src/main.cpp` is the composition root only** — it wires adapters/domain/application objects together, calls setup once, and calls non-blocking `update()`/`poll()` methods from `loop()`. No business logic lives here.
-- **No blocking calls** (`delay()`) in domain/application code — timing goes through the `Clock` port.
+- **No blocking calls** (`delay()`) in domain/application code — timing goes through the `Clock` port (shared, from `mcs-core`).
 - Classes are built **needs-driven**, following the Build Order in `docs/software-class-list.md` — value objects first, then the smallest pure-logic domain class (`Debouncer`), working up to adapters and the composition root last.
+
+### Shared libraries (`mcs-core`, `mcs-net`)
+
+Code shared with the MaltbeeController project lives in two public PlatformIO libraries, pinned by tag in `platformio.ini` (both the `esp32dev` and `native` environments):
+
+- [`mcs-core`](https://github.com/MyTurnyet/mcs-core) — the `Clock` port.
+- [`mcs-net`](https://github.com/MyTurnyet/mcs-net) — `MqttLink`, `WiFiLink`, `EspMdnsResolver`, `BrokerAddressResolver`, the `MqttTransport`/`MdnsResolver` ports, the Loco2MQTT `/state` listener, presence classes, and test fakes (`testing/FakeClock.h`, `FakeMqttTransport.h`, `FakeMdnsResolver.h`).
+
+Do not re-add these files under `lib/`. Change them in the library repo, tag a new version, then bump the tag in `platformio.ini`. See the "Loco2MQTT integration" section of `docs/software-class-list.md` for the topics this board listens on and publishes.
 
 ### Current source layout
 

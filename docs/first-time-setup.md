@@ -18,9 +18,12 @@ Identification").
 - Your home WiFi network name (SSID) and password. The ESP32 only joins
   **2.4 GHz** networks — if your home network is 5 GHz-only, use your
   router's 2.4 GHz band/SSID instead.
-- The address and port of your MQTT broker (the JMRI computer's IP address
-  and the broker port — ask whoever set up JMRI if you don't know this;
-  the default MQTT port is `1883`).
+- The address and port of your MQTT broker — the Loco2MQTT device's IP
+  address and its broker port (the default MQTT port is `1883`). The board
+  first tries to find the device by its name, `loco2mqtt.local`, and falls
+  back to the address you enter here if that lookup fails.
+- The LocoNet turnout address (1–2048) each of this board's turnouts should
+  answer to, as set up in JMRI.
 - A node ID for this board: a number from **1 to 16**, unique among all the
   turnout controller boards on your layout.
 
@@ -67,6 +70,9 @@ Enter:
 - **WiFi SSID** / **WiFi Password** — your home network credentials.
 - **Broker Host** / **Broker Port** — your MQTT broker's address (e.g.
   `192.168.1.50`) and port (usually `1883`).
+- Under **Advanced: Turnout Wiring**, each channel's **LocoNet Address**.
+  Leave it blank for a channel that isn't used; the board ignores that
+  channel's commands.
 
 Press **Save**.
 
@@ -85,8 +91,8 @@ Once rebooted, the board's status LED tells you what's going on:
 |---|---|
 | Off | Normal — running quietly, nothing to report. |
 | Blinks its node number (N short blinks, pause, repeat) | Someone short-pressed BOOT to ask "which board is this?" — see below. |
-| Fast, steady blinking (no pauses) | **Duplicate node ID** — another board on the network already claims this ID. Re-enter setup mode (Step 1) and give this board a different ID. |
-| Three quick flashes | Received a turnout command from JMRI — confirms MQTT commands are reaching this board. |
+| Fast, steady blinking (no pauses) | **Duplicate node ID** — another board on the network is announcing the same ID (this can appear up to about 30 seconds after the board starts). The board stops applying turnout commands. Re-enter setup mode (Step 1) and give this board a different ID. |
+| Three quick flashes | Received a turnout command from Loco2MQTT — confirms commands are reaching this board. |
 
 To confirm a board's identity once it's running normally, **briefly** press
 BOOT (a quick tap, not a hold) — the LED will blink out its node number for
@@ -109,13 +115,12 @@ working.
   seconds and release it — check again after it reboots.
 - **The setup page didn't pop up automatically:** browse to
   `http://192.168.4.1` manually (Step 3).
-- **Turnouts don't move even though the board is online:** turnout wiring
-  (which GPIO pin drives which Tortoise, feedback pins, orientation, etc.)
-  is **not** configured through this wireless form — it's set up ahead of
-  time by the builder over a USB serial connection. If turnouts aren't
-  responding on a board that otherwise joined WiFi/MQTT successfully, that
-  wiring likely wasn't completed — contact whoever built the board rather
-  than trying to fix it wirelessly.
+- **Turnouts don't move even though the board is online:** check two things
+  on the setup form's **Advanced: Turnout Wiring** section. First, each
+  channel needs a **LocoNet Address** — a channel with a blank address
+  never receives commands. Second, the channel's pin, feedback pin and
+  orientation must match how the Tortoise is wired. Re-enter setup mode
+  (Step 1) to fix either one.
 - **Forgot the WiFi password you entered, or need to redo it:** there's no
   way to review saved settings from the wireless form — just re-enter setup
   mode (Step 1) and submit the form again with corrected values.

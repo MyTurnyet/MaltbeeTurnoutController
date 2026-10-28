@@ -2,6 +2,28 @@
 
 > Source of truth: [ESP32 Turnout Controller — Software Class List](https://docs.google.com/document/d/1jbSANH3e8IK4dgGmmz0WCU5wKDMwLRFA2LSdcXLwdoc/edit) (Google Doc). Pulled into the repo on 2026-08-15, re-synced same day to pick up the Node Configuration/Commissioning and Wireless Commissioning sections (superseding an earlier revision at doc id `1pA2lRrbFkzAZD5v-xEVw-N_5N47QN5GiCVkWwlXZWMM`). Re-sync this file if the doc changes again.
 
+> **Repo copy updated 2026-10-28 for the Loco2MQTT integration.** The Google Doc above has not been updated; where this file and the Doc disagree about MQTT, presence or the classes named below, this file reflects the code.
+
+## Loco2MQTT integration and shared libraries (2026-10-28)
+
+The board no longer talks to JMRI's MQTT topics directly. It listens for the states **Loco2MQTT** publishes and reports its own positions, using code shared with the MaltbeeController project through two public PlatformIO libraries pinned by tag in `platformio.ini`:
+
+- [`mcs-core`](https://github.com/MyTurnyet/mcs-core) — the `Clock` port (`unsigned long nowMilliseconds()`).
+- [`mcs-net`](https://github.com/MyTurnyet/mcs-net) — `MqttTransport`/`MdnsResolver` ports, `BrokerAddressResolver`, the `MqttLink`/`WiFiLink`/`EspMdnsResolver` adapters, the Loco2MQTT `/state` listener (`BasicLoco2MqttStateSource<N>`), presence (`NodePresenceTopics`, `NodePresenceAnnouncer`, `NodeIdentityGuard`) and test fakes (`testing/FakeClock.h`, `FakeMqttTransport.h`, `FakeMdnsResolver.h`).
+
+| Concern | Now | Replaced |
+|---|---|---|
+| Commands in | `Loco2MqttCommandSource` listens on `loconet/turnout/<LocoNet address>/state` (payload `CLOSED`/`THROWN`) and calls `TurnoutCommandSink` through a `GatedCommandSink` | `MqttCommandSource` on `track/turnout/<id>` |
+| Positions out | `Loco2MqttPositionReporter` publishes `mcs/turnout/<LocoNet address>/position` (`CLOSED`/`THROWN`/`INCONSISTENT`/`UNKNOWN`), never retained; `PeriodicPositionRepublisher` re-sends all positions on connect and every 30 s | `MqttPositionReporter` (retained, `track/turnout/<id>`) |
+| Presence | `NodePresenceAnnouncer` publishes `online` and the board's MAC suffix on `mcs/turnout/<node id>/status` and `/mac`, never retained, on connect and every 30 s; the client id is `maltbee-turnout-<last 4 of MAC>` | retained `node/<id>/status` plus a 500 ms boot-time check |
+| ID clash | `NodeIdentityGuard` latches when a different MAC appears on this node's `/mac` topic; `NodeIdentityGate` then closes the `GatedCommandSink` and `ControllerNode::blocked()` drives the fast blink. Detection is continuous, so a clash can appear up to ~30 s after boot | `NodeIdCollisionGuard`, `NodePresenceReporter`, `MqttNodePresenceReporter` |
+| Broker address | `BrokerAddressResolver` tries mDNS `loco2mqtt.local` first (at most once per 60 s) and falls back to the configured broker host | configured host only |
+| LocoNet addresses | `NodeConfig::locoNetAddresses()` (0 = unconfigured, otherwise 1–2048, no duplicates); set with the serial command `address <n> <locoNetAddress>` or the setup page's per-channel LocoNet Address field | — |
+
+Loco2MQTT re-publishes every known state about every 30 s. A repeated state is harmless: `TurnoutMotion::commandTo()` does nothing when the turnout is already at rest in the requested position.
+
+Commissioning and the turnout domain were deliberately **not** shared with MaltbeeController (different config shapes, commands and storage); revisit if the two converge.
+
 Companion to the project notes and the breadboard prototype doc. This
 **supersedes** the earlier generic-HAL draft (`docs/esp32-hal-class-list.md`,
 now removed): the actual project is the **ESP32 Turnout Controller**
@@ -73,10 +95,10 @@ Pure virtual interfaces the domain calls outward through.
 
 | Interface | Method(s) | Real implementation | Test double |
 |---|---|---|---|
-| `Clock` | `Instant now()` | `ArduinoClock` (millis) | `ManualClock` — advances only when told |
+| `Clock` | `unsigned long nowMilliseconds()` (from `mcs-core`) | `ArduinoClock` (millis; also offers `Instant now()`) | `FakeClock` (`mcs-net`) — advances only when told |
 | `DigitalOutput` | `void write(Level)` | `EspDigitalOutput` | `RecordingOutput` — remembers writes |
 | `DigitalInput` | `Level read()` | `EspDigitalInput` | `ScriptedInput` — returns a queued sequence |
-| `PositionReporter` | `void report(TurnoutId, TurnoutState)` | `MqttPositionReporter` | `CapturingReporter` |
+| `PositionReporter` | `void report(TurnoutId, TurnoutState)` | `Loco2MqttPositionReporter` | `FakePositionReporter` |
 | `ConfigStore` | `load()` / `save()` | `NvsConfigStore` | `InMemoryConfigStore` |
 
 **Deliberately dumb ports.** `DigitalOutput` knows about voltage levels, not
@@ -94,7 +116,7 @@ not PWM speed control. See [Reconciling the scaffolded code with this design](#r
 
 | Interface | Method | Implemented by | Called by |
 |---|---|---|---|
-| `TurnoutCommandSink` | `void command(TurnoutId, TurnoutPosition)` | `TurnoutRegistry` | `MqttCommandSource` |
+| `TurnoutCommandSink` | `void command(TurnoutId, TurnoutPosition)` | `TurnoutRegistry`, `GatedCommandSink` | `Loco2MqttCommandSource` |
 
 Only one, intentionally. Every external command path — MQTT now, LCC or
 fascia buttons later — arrives through this single door.
@@ -171,16 +193,16 @@ semantics fall out for free. Unknown ids are dropped — ownership is
 arithmetic (`id / 100 == nodeId`, `channel id % 100`), a safety net since the
 node only subscribes to its own topics anyway.
 
-### `TopicScheme`
+### `TopicScheme` (retired 2026-10-28)
 
-Builds and parses MQTT topics. `parse(topic) -> optional<TurnoutId>`,
+Replaced by `PositionTopic` (outbound `mcs/turnout/<address>/position`) and mcs-net's `Loco2MqttTurnoutAddress` (inbound `/state`). Original description: builds and parses MQTT topics. `parse(topic) -> optional<TurnoutId>`,
 `topicFor(TurnoutId) -> string`. Pure string work, no network — separated so
 topic conventions are testable on the host without a broker.
 
 ### `PayloadCodec`
 
 `CLOSED` / `THROWN` ↔ `TurnoutPosition`, and `TurnoutState` → outbound
-payload. Also pure.
+payload. Also pure. Inbound decoding now goes through mcs-net's `Loco2MqttPayloadCodec`; only the `TurnoutState` → payload encoding is still used here.
 
 ---
 
@@ -195,17 +217,19 @@ domain.
 | `EspDigitalOutput` | digitalWrite | Sets pinMode in constructor |
 | `EspDigitalInput` | digitalRead | Constructor takes whether an internal pull-up is available — GPIO 36/39 have none |
 | `NvsConfigStore` | Preferences | Configuration only — position is deliberately not persisted (see below) |
-| `WiFiLink` | WiFi association | Non-blocking reconnect |
-| `MqttLink` | broker connection | Non-blocking reconnect, sets a Last Will and Testament |
-| `MqttCommandSource` | subscription | Parses via `TopicScheme` + `PayloadCodec`, calls `TurnoutCommandSink` |
-| `MqttPositionReporter` | publish | Implements `PositionReporter`, sets the retain flag |
+| `WiFiLink` | WiFi association | Now in `mcs-net` |
+| `MqttLink` | broker connection | Now in `mcs-net`; sets a Last Will and Testament, resolves the broker via mDNS first |
+| `Loco2MqttCommandSource` | subscription | Drains mcs-net's `Loco2MqttStateSource8`, calls `TurnoutCommandSink` |
+| `Loco2MqttPositionReporter` | publish | Implements `PositionReporter`; not retained |
 
 **Why no position persistence:** feedback exists, and a remembered value is
 strictly worse than a measurement — it's a claim about the past that's wrong
 if anything moved while powered down. NVS holds configuration only.
 
-**Why the retain flag matters:** if the node publishes before JMRI connects,
-an unretained message is lost and JMRI sits on a stale assumption.
+**Why positions are not retained:** Loco2MQTT's broker ignores the retain flag, so
+`PeriodicPositionRepublisher` re-sends every position on connect and every 30 s
+instead. (Under the earlier JMRI-direct design, positions were retained so a
+late-connecting JMRI wouldn't sit on a stale assumption.)
 
 ---
 
@@ -496,7 +520,7 @@ given node.
 |---|---|---|
 | `FlashBurst` | Domain | Given on/off durations and a flash count, produces a one-shot on/off `Level` sequence that settles dark after the burst — unlike `BlinkOutIdentifier`, it does not pause and repeat. Pure — no `Clock`, no hardware. |
 
-`MqttCommandSource` exposes an edge-triggered `consumeReceived()` (read-and-
+`Loco2MqttCommandSource` exposes an edge-triggered `consumeReceived()` (read-and-
 clear), set only when a payload is successfully decoded and dispatched — not
 on malformed payloads or this node's own presence-topic traffic. See
 `docs/superpowers/specs/2026-08-18-mqtt-activity-led-design.md` for the full
@@ -509,20 +533,25 @@ rotary switch did (no physical board-by-board differentiation forcing the
 installer to notice). Caught via MQTT rather than in the dropdown itself,
 since only the broker sees all nodes at once:
 
-- On boot, before fully starting, a node publishes a **retained** presence
-  message to `node/<id>/status = online` and **subscribes** to that same
-  topic first.
-- If a retained message from a *different* boot session already claims that
-  id, the node refuses to fully come online and blinks an error pattern
-  (distinct from the identify blink) instead.
-- This also gives a live "which nodes are online" view for free —
-  `mosquitto_sub -t 'node/+/status'` — independent of JMRI.
+- **Superseded 2026-10-28** (see the Loco2MQTT section at the top). The board now
+  announces `online` and its MAC suffix on `mcs/turnout/<id>/status` and
+  `/mac`, never retained, on connect and every 30 seconds, and listens on its
+  own `/mac` topic.
+- If a message carries a *different* MAC, the node latches a collision: it stops
+  applying turnout commands and blinks the error pattern (distinct from the
+  identify blink). Because the check is continuous, a clash can show up
+  up to ~30 s after boot.
+- Live "which boards are online" view:
+  `mosquitto_sub -t 'mcs/turnout/+/status'`.
 
 | Class | Layer | Responsibility |
 |---|---|---|
-| `NodePresenceReporter` | Port | `void announce(NodeId)` — publish retained presence |
-| `MqttNodePresenceReporter` | Adapter | Implements it via `MqttLink`, sets the retain flag |
-| `NodeIdCollisionGuard` | Domain | Given the current node's id and an observed presence message, decides collision vs. self vs. unrelated. Pure — testable with plain values, no broker needed. |
+| `NodePresenceAnnouncer` | `mcs-net` | Publishes `online` and the MAC suffix, not retained, on connect and every 30 s |
+| `NodeIdentityGuard` | `mcs-net` | Latches a collision when a MAC other than its own is observed |
+| `NodeIdentityGate` | Adapter | `CommandGate` that closes once the guard has latched |
+| `GatedCommandSink` | Domain | Forwards commands to the registry only while the gate is open |
+
+*Earlier design (retired):* `NodePresenceReporter`, `MqttNodePresenceReporter` and `NodeIdCollisionGuard` published a retained `node/<id>/status` and checked for a clash once at boot.
 
 ### Updated Per-Customer Workflow
 
